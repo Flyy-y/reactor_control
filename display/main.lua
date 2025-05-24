@@ -154,6 +154,28 @@ local function drawDisplay()
     ui.getMonitor().setTextColor(colors.white)
 end
 
+local function checkForUpdates()
+    if not fs.exists("/reactor_control/updater.lua") then
+        return
+    end
+    
+    local updater = dofile("/reactor_control/updater.lua")
+    updater.setConfig({
+        github_user = "Flyy-y",
+        github_repo = "reactor_control",
+        branch = "main",
+        files = {
+            "shared/network.lua",
+            "shared/protocol.lua",
+            "display/main.lua",
+            "display/ui.lua"
+        }
+    })
+    
+    -- This will check and update, then reboot if updates were found
+    updater.checkAndUpdate()
+end
+
 local function main()
     init()
     
@@ -161,6 +183,7 @@ local function main()
     
     local updateTimer = os.startTimer(config.update_interval)
     local requestTimer = os.startTimer(0.1)
+    local updateCheckTimer = os.startTimer(60)  -- Check for updates every 60 seconds
     
     while running do
         local event, p1, p2, p3, p4, p5 = os.pullEvent()
@@ -175,6 +198,10 @@ local function main()
                 requestSystemStatus()
                 requestAlerts()
                 requestTimer = os.startTimer(config.update_interval)
+            elseif p1 == updateCheckTimer then
+                print("Checking for updates...")
+                checkForUpdates()
+                updateCheckTimer = os.startTimer(60)
             end
         elseif event == "key" and p1 == keys.q then
             running = false

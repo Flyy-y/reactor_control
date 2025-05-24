@@ -151,12 +151,35 @@ local function displayStatus()
         stats.cells, stats.providers))
 end
 
+local function checkForUpdates()
+    if not fs.exists("/reactor_control/updater.lua") then
+        return
+    end
+    
+    local updater = dofile("/reactor_control/updater.lua")
+    updater.setConfig({
+        github_user = "Flyy-y",
+        github_repo = "reactor_control",
+        branch = "main",
+        files = {
+            "shared/network.lua",
+            "shared/protocol.lua",
+            "battery/main.lua",
+            "battery/battery_api.lua"
+        }
+    })
+    
+    -- This will check and update, then reboot if updates were found
+    updater.checkAndUpdate()
+end
+
 local function main()
     init()
     
     local statusTimer = os.startTimer(config.update_interval)
     local heartbeatTimer = os.startTimer(config.heartbeat_interval)
     local displayTimer = os.startTimer(config.display.update_interval)
+    local updateCheckTimer = os.startTimer(60)  -- Check for updates every 60 seconds
     
     sendBatteryStatus()
     sendHeartbeat()
@@ -176,6 +199,10 @@ local function main()
             elseif p1 == displayTimer then
                 displayStatus()
                 displayTimer = os.startTimer(config.display.update_interval)
+            elseif p1 == updateCheckTimer then
+                print("Checking for updates...")
+                checkForUpdates()
+                updateCheckTimer = os.startTimer(60)
             end
         elseif event == "key" and p1 == keys.q then
             running = false
