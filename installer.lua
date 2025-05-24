@@ -12,6 +12,49 @@ local function printHeader()
     print()
 end
 
+local function mergeConfig(githubConfig, localConfig)
+    -- Start with the local config (preserves user settings)
+    local result = {}
+    
+    -- Deep copy the local config first
+    local function deepCopy(t)
+        if type(t) ~= "table" then return t end
+        local copy = {}
+        for k, v in pairs(t) do
+            copy[k] = deepCopy(v)
+        end
+        return copy
+    end
+    
+    -- If we have a local config, use it as base
+    if localConfig then
+        result = deepCopy(localConfig)
+    end
+    
+    -- Add any missing keys from GitHub config
+    local function addMissingKeys(target, source)
+        for k, v in pairs(source) do
+            if target[k] == nil then
+                -- Key doesn't exist in local config, add it
+                if type(v) == "table" then
+                    target[k] = deepCopy(v)
+                else
+                    target[k] = v
+                end
+            elseif type(v) == "table" and type(target[k]) == "table" then
+                -- Both are tables, recursively add missing keys
+                addMissingKeys(target[k], v)
+            end
+            -- If key exists in local config, keep the local value
+        end
+    end
+    
+    -- Add missing keys from GitHub config
+    addMissingKeys(result, githubConfig)
+    
+    return result
+end
+
 local function writeConfig(path, config)
     local file = fs.open(path, "w")
     file.write("return " .. textutils.serialize(config))
@@ -362,7 +405,32 @@ local function installComponent(component, privateKey)
         end
     end
     
-    -- Write config
+    -- Download config file from GitHub
+    local configFile = ""
+    if component == "Server" then
+        configFile = "server/config.lua"
+    elseif component == "Reactor Controller" then
+        configFile = "reactor/config.lua"
+    elseif component == "Battery Controller" then
+        configFile = "battery/config.lua"
+    elseif component == "Display" then
+        configFile = "display/config.lua"
+    end
+    
+    print("\nDownloading base configuration...")
+    local configUrl = getGithubUrl(configFile)
+    local tempConfigPath = "/reactor_control/temp_config.lua"
+    
+    local baseConfig = {}
+    if downloadFile(configUrl, tempConfigPath) then
+        baseConfig = dofile(tempConfigPath)
+        fs.delete(tempConfigPath)
+        print("Base configuration loaded from GitHub")
+    else
+        print("Warning: Could not download base config, using minimal defaults")
+    end
+    
+    -- Determine config path and read existing config
     local configPath = ""
     if component == "Server" then
         configPath = "/reactor_control/server/config.lua"
@@ -374,8 +442,38 @@ local function installComponent(component, privateKey)
         configPath = "/reactor_control/display/config.lua"
     end
     
+    -- Read existing local config if it exists
+    local existingLocalConfig = readConfig(configPath)
+    
+    -- If no existing config, create minimal one with user values
+    if not existingLocalConfig then
+        existingLocalConfig = {}
+        if component == "Server" then
+            existingLocalConfig.privateKey = privateKey
+        elseif component == "Reactor Controller" then
+            existingLocalConfig.privateKey = privateKey
+            existingLocalConfig.reactor_id = config.reactor_id
+        elseif component == "Battery Controller" then
+            existingLocalConfig.privateKey = privateKey
+        elseif component == "Display" then
+            existingLocalConfig.privateKey = privateKey
+            existingLocalConfig.display_id = config.display_id
+        end
+    else
+        -- Update critical fields in existing config
+        existingLocalConfig.privateKey = privateKey
+        if component == "Reactor Controller" then
+            existingLocalConfig.reactor_id = config.reactor_id
+        elseif component == "Display" then
+            existingLocalConfig.display_id = config.display_id
+        end
+    end
+    
+    -- Merge: keep all local values, add missing keys from GitHub
+    local finalConfig = mergeConfig(baseConfig, existingLocalConfig)
+    
     print("\nWriting configuration...")
-    writeConfig(configPath, config)
+    writeConfig(configPath, finalConfig)
     
     -- Download and use the appropriate startup file
     local startupFile = ""

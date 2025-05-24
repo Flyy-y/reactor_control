@@ -63,6 +63,7 @@ end
 local function sendBatteryStatus()
     local stats = battery_api.getStats()
     if not stats then
+        print("Failed to get battery stats")
         return
     end
     
@@ -76,6 +77,7 @@ local function sendBatteryStatus()
     )
     
     network.send(config.server_channel, message)
+    print(string.format("Sent battery status: %.1f%%", stats.energyPercent))
 end
 
 local function sendHeartbeat()

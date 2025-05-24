@@ -1,4 +1,5 @@
 return {
+    privateKey = "YOUR_PRIVATE_KEY_HERE",  -- Replace with your actual private key
     modem_channel = 100,
     reactor_channels = {101, 102, 103, 104},
     battery_channel = 110,

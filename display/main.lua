@@ -43,7 +43,12 @@ local function requestSystemStatus()
     
     if success and response.data then
         systemStatus = response.data
-        
+        print("Got system status update")
+    else
+        print("Failed to get system status: " .. tostring(response))
+    end
+    
+    if systemStatus then
         for reactorId, reactor in pairs(systemStatus.reactors or {}) do
             if not temperatureHistory[reactorId] then
                 temperatureHistory[reactorId] = {}

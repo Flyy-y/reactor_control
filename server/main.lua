@@ -107,7 +107,7 @@ local function optimizeBurnRates()
     
     for reactorId, reactor in pairs(status.reactors or {}) do
         -- Skip manually scrammed reactors
-        if not manualScramReactors[reactorId] and reactor.active then
+        if not manualScramReactors[reactorId] then
             local maxBurn = reactor.max_burn_rate or 100
             local currentBurn = reactor.burn_rate or 0
             local targetBurn = currentBurn
@@ -137,8 +137,27 @@ local function optimizeBurnRates()
                 end
             end
             
-            -- Send burn rate adjustment if needed
-            if math.abs(targetBurn - currentBurn) > 0.1 then
+            -- Auto-activate reactor if battery is low and reactor is off
+            if batteryPercent < config.auto_control.battery_low and not reactor.active and targetBurn > 0 then
+                local activateMsg = network.createMessage(
+                    protocol.messageTypes.REQUEST,
+                    protocol.commands.REACTOR_CONTROL,
+                    {
+                        reactor_id = reactorId,
+                        action = "activate"
+                    }
+                )
+                
+                local reactorChannel = config.reactor_channels[reactorId]
+                if reactorChannel then
+                    network.send(reactorChannel, activateMsg)
+                    storage.log(string.format("Auto-activating reactor %d due to low battery (%.1f%%)", 
+                        reactorId, batteryPercent))
+                end
+            end
+            
+            -- Send burn rate adjustment if needed (only for active reactors)
+            if reactor.active and math.abs(targetBurn - currentBurn) > 0.1 then
                 local controlMsg = network.createMessage(
                     protocol.messageTypes.REQUEST,
                     protocol.commands.REACTOR_CONTROL,
