@@ -347,12 +347,12 @@ function ui.formatTime(epoch)
     return os.date("%H:%M:%S", epoch / 1000)
 end
 
-function ui.getMonitor()
-    return monitor
-end
-
 function ui.getSize()
     return width, height
+end
+
+function ui.getMonitor()
+    return monitor
 end
 
 function ui.isButtonClicked(button, clickX, clickY)

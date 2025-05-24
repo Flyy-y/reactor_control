@@ -227,7 +227,45 @@ local function main()
     ui.clear()
 end
 
+-- Function to show error on monitor
+local function showErrorOnMonitor(errorMsg)
+    if ui and ui.getMonitor then
+        local monitor = ui.getMonitor()
+        if monitor then
+            -- Set red background
+            monitor.setBackgroundColor(colors.red)
+            monitor.clear()
+            
+            local w, h = monitor.getSize()
+            
+            -- Draw "DISPLAY STOPPED" in center
+            monitor.setTextColor(colors.white)
+            monitor.setTextScale(2)  -- Make it big
+            
+            local text1 = "DISPLAY"
+            local text2 = "STOPPED"
+            
+            -- Center the text
+            monitor.setCursorPos(math.floor((w - #text1) / 2) + 1, math.floor(h / 2) - 1)
+            monitor.write(text1)
+            monitor.setCursorPos(math.floor((w - #text2) / 2) + 1, math.floor(h / 2) + 1)
+            monitor.write(text2)
+            
+            -- Show error message if provided
+            if errorMsg then
+                monitor.setTextScale(0.5)
+                monitor.setCursorPos(2, h - 1)
+                monitor.write("Error: " .. string.sub(tostring(errorMsg), 1, w - 4))
+            end
+        end
+    end
+end
+
 local success, err = pcall(main)
 if not success then
     print("Display error: " .. tostring(err))
+    showErrorOnMonitor(err)
+else
+    -- Normal shutdown
+    showErrorOnMonitor("Shutdown")
 end
