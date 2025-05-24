@@ -50,7 +50,7 @@ function updater.checkAndUpdate()
     
     local allSuccess = true
     
-    -- Always download all files (no hash checking)
+    -- Download all files
     for _, file in ipairs(config.files) do
         local url = getGithubUrl(file)
         local destination = "/reactor_control/" .. file
@@ -58,6 +58,60 @@ function updater.checkAndUpdate()
         if not downloadFile(url, destination) then
             allSuccess = false
         end
+    end
+    
+    if allSuccess then
+        print("All files updated successfully!")
+        
+        -- Create a temporary file to signal we just updated
+        local flagFile = fs.open("/.just_updated", "w")
+        flagFile.write("true")
+        flagFile.close()
+        
+        print("Restarting in 3 seconds...")
+        sleep(3)
+        os.reboot()
+    else
+        print("Some updates failed. Please check your connection.")
+        print("Continuing with existing files...")
+    end
+    
+    return allSuccess
+end
+
+function updater.forceUpdate()
+    print("Downloading latest versions of all files...")
+    
+    local allSuccess = true
+    
+    -- Download all files (except updater itself)
+    for _, file in ipairs(config.files) do
+        local url = getGithubUrl(file)
+        local destination = "/reactor_control/" .. file
+        
+        if not downloadFile(url, destination) then
+            allSuccess = false
+        end
+    end
+    
+    -- Also update the updater itself
+    print("  Downloading: /reactor_control/updater.lua")
+    local updaterUrl = getGithubUrl("updater.lua")
+    local tempPath = "/reactor_control/updater_new.lua"
+    local response = http.get(updaterUrl)
+    if response then
+        local content = response.readAll()
+        response.close()
+        local file = fs.open(tempPath, "w")
+        file.write(content)
+        file.close()
+        -- Replace updater after all other files are done
+        fs.delete("/reactor_control/updater.lua")
+        fs.move(tempPath, "/reactor_control/updater.lua")
+        print("  Success: updater.lua updated")
+    else
+        print("  Failed: updater.lua")
+        allSuccess = false
     end
     
     if allSuccess then
@@ -71,11 +125,6 @@ function updater.checkAndUpdate()
     end
     
     return allSuccess
-end
-
-function updater.forceUpdate()
-    -- forceUpdate now does the same as checkAndUpdate (always download everything)
-    return updater.checkAndUpdate()
 end
 
 return updater
