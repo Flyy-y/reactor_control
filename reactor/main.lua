@@ -277,6 +277,29 @@ local function checkEmergency(stats)
     return false
 end
 
+local function checkServerTimeout()
+    local timeSinceContact = (os.epoch("utc") - lastServerContact) / 1000  -- Convert to seconds
+    
+    if timeSinceContact > 20 and isActive() then
+        print("\nWARNING: No server contact for " .. math.floor(timeSinceContact) .. " seconds!")
+        print("SAFETY SHUTDOWN - Scraming reactor!")
+        scram()
+        
+        -- Send alert
+        local alert = network.createMessage(
+            protocol.messageTypes.BROADCAST,
+            protocol.commands.ALERT,
+            protocol.createAlert(
+                protocol.alertLevels.EMERGENCY,
+                "reactor_" .. config.reactor_id,
+                "Safety shutdown - lost server connection",
+                {timeout_seconds = timeSinceContact}
+            )
+        )
+        network.broadcast(alert)
+    end
+end
+
 local function sendReactorStatus()
     local stats = getStats()
     if not stats then
@@ -285,6 +308,7 @@ local function sendReactorStatus()
     
     if os.epoch("utc") - lastEmergencyCheck > 1000 then
         checkEmergency(stats)
+        checkServerTimeout()  -- Check for server timeout
         lastEmergencyCheck = os.epoch("utc")
     end
     
@@ -304,6 +328,9 @@ local function handleReactorControl(message)
     if data.reactor_id ~= config.reactor_id then
         return
     end
+    
+    -- Update last server contact time
+    lastServerContact = os.epoch("utc")
     
     local success = false
     local result = "Unknown action"
@@ -382,6 +409,11 @@ local function displayStatus()
 end
 
 local function handleDiscoverReactors(message, channel)
+    -- Update last server contact if from server
+    if channel == config.server_channel then
+        lastServerContact = os.epoch("utc")
+    end
+    
     -- Respond with our reactor info
     local response = network.createMessage(
         protocol.messageTypes.RESPONSE,
