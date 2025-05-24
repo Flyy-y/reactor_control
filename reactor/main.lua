@@ -1,6 +1,6 @@
 local network = dofile("/reactor_control/shared/network.lua")
 local protocol = dofile("/reactor_control/shared/protocol.lua")
-local reactor_api = dofile("/reactor_control/reactor_api.lua")
+local reactor_api = dofile("/reactor_control/reactor/reactor_api.lua")
 
 local config = dofile("/reactor_control/reactor/config.lua")
 

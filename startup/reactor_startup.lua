@@ -11,7 +11,7 @@ if fs.exists("/reactor_control/updater.lua") then
             "shared/network.lua",
             "shared/protocol.lua",
             "reactor/main.lua",
-            "reactor_api.lua",
+            "reactor/reactor_api.lua",
             "reactor/config.lua"
         }
     })
