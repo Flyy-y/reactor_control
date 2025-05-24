@@ -94,6 +94,26 @@ function ui.drawReactorStatus(x, y, reactorId, reactor)
     
     ui.drawBox(x, y, boxWidth, boxHeight, "Reactor " .. reactorId)
     
+    -- Add status indicator for reactor data freshness
+    local statusIndicator = "●"
+    local dataStatusColor = config.colors.inactive
+    local currentTime = os.epoch("utc")
+    
+    if reactor and reactor.last_update then
+        local timeSinceUpdate = (currentTime - reactor.last_update) / 1000  -- Convert to seconds
+        if timeSinceUpdate <= 10 then
+            dataStatusColor = config.colors.good  -- Green for fresh data
+        else
+            dataStatusColor = config.colors.critical  -- Red for stale data
+        end
+    end
+    
+    -- Draw status indicator in top right of reactor box
+    monitor.setCursorPos(x + boxWidth - 2, y + 1)
+    monitor.setTextColor(dataStatusColor)
+    monitor.write(statusIndicator)
+    monitor.setTextColor(config.colors.text)
+    
     local statusColor = reactor.active and config.colors.active or config.colors.inactive
     local statusText = reactor.active and "ONLINE" or "OFFLINE"
     
@@ -187,6 +207,26 @@ function ui.drawBatteryStatus(x, y, battery)
     local boxHeight = math.floor((height - 3) / 2)
     
     ui.drawBox(x, y, boxWidth, boxHeight, "Battery")
+    
+    -- Add status indicator for battery data freshness
+    local statusIndicator = "●"
+    local statusColor = config.colors.inactive
+    local currentTime = os.epoch("utc")
+    
+    if battery and battery.last_update then
+        local timeSinceUpdate = (currentTime - battery.last_update) / 1000  -- Convert to seconds
+        if timeSinceUpdate <= 10 then
+            statusColor = config.colors.good  -- Green for fresh data
+        else
+            statusColor = config.colors.critical  -- Red for stale data
+        end
+    end
+    
+    -- Draw status indicator in top right of battery box
+    monitor.setCursorPos(x + boxWidth - 2, y + 1)
+    monitor.setTextColor(statusColor)
+    monitor.write(statusIndicator)
+    monitor.setTextColor(config.colors.text)
     
     if not battery then
         monitor.setCursorPos(x + 2, y + 2)

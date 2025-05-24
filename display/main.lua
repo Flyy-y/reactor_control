@@ -11,7 +11,6 @@ local alerts = {}
 local temperatureHistory = {}
 local batteryHistory = {}
 local reactorButtons = {}
-local controlPanelButtons = nil
 
 local function init()
     term.clear()
@@ -145,10 +144,6 @@ local function drawDisplay()
         local batteryY = math.floor(h / 2) + 2
         ui.drawBatteryStatus(2, batteryY, systemStatus.battery)
         
-        -- Draw control panel if space allows
-        if w > 60 then
-            controlPanelButtons = ui.drawControlPanel(math.floor(w / 2) + 2, batteryY)
-        end
         
         -- Alerts on the right side if space allows
         if w > 80 then
@@ -214,20 +209,6 @@ local function main()
                 end
             end
             
-            -- Check control panel buttons
-            if controlPanelButtons then
-                if ui.isButtonClicked(controlPanelButtons.scramAllButton, x, y) then
-                    -- Send SCRAM to all reactors
-                    for reactorId, _ in pairs(systemStatus.reactors or {}) do
-                        sendReactorControl(reactorId, "scram")
-                    end
-                elseif ui.isButtonClicked(controlPanelButtons.startAllButton, x, y) then
-                    -- Send START to all reactors
-                    for reactorId, _ in pairs(systemStatus.reactors or {}) do
-                        sendReactorControl(reactorId, "activate")
-                    end
-                end
-            end
             
             -- Redraw after interaction
             os.sleep(0.1)
