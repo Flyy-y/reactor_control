@@ -428,12 +428,18 @@ local function handleDiscoverReactors(message, channel)
     network.send(channel, response)
 end
 
+local function handlePing(message, channel)
+    -- Update last server contact time when receiving ping
+    lastServerContact = os.epoch("utc")
+    print("Received server ping")
+end
 
 local function main()
     init()
     
     network.on(protocol.commands.REACTOR_CONTROL, handleReactorControl)
     network.on(protocol.commands.DISCOVER_REACTORS, handleDiscoverReactors)
+    network.on(protocol.commands.HEARTBEAT, handlePing)
     
     local statusTimer = os.startTimer(config.update_interval)
     local heartbeatTimer = os.startTimer(config.heartbeat_interval)

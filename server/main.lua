@@ -172,9 +172,30 @@ local function checkAndSendAlerts()
     end
 end
 
+local function pingReactors()
+    -- Send ping to all known reactors to maintain contact
+    local status = rules.getSystemStatus()
+    for reactorId, reactor in pairs(status.reactors or {}) do
+        local pingMsg = network.createMessage(
+            protocol.messageTypes.REQUEST,
+            protocol.commands.HEARTBEAT,
+            {
+                type = "ping",
+                timestamp = os.epoch("utc")
+            }
+        )
+        
+        local reactorChannel = config.reactor_channels[reactorId]
+        if reactorChannel then
+            network.send(reactorChannel, pingMsg)
+        end
+    end
+end
+
 local function periodicTasks()
     checkAndSendAlerts()
     optimizeBurnRates()  -- Add burn rate optimization
+    pingReactors()  -- Ping reactors to maintain contact
     
     local health = rules.checkComponentHealth(config)
     for component, isHealthy in pairs(health.reactors) do
