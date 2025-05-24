@@ -203,6 +203,14 @@ local function main()
                     else
                         sendReactorControl(buttons.reactorId, "activate")
                     end
+                elseif buttons.decreaseBurnButton and ui.isButtonClicked(buttons.decreaseBurnButton, x, y) then
+                    -- Decrease burn rate by 1 mB/t
+                    local newBurnRate = math.max(0, (buttons.burnRate or 0) - 1)
+                    sendReactorControl(buttons.reactorId, "set_burn_rate", newBurnRate)
+                elseif buttons.increaseBurnButton and ui.isButtonClicked(buttons.increaseBurnButton, x, y) then
+                    -- Increase burn rate by 1 mB/t (max 100)
+                    local newBurnRate = math.min(100, (buttons.burnRate or 0) + 1)
+                    sendReactorControl(buttons.reactorId, "set_burn_rate", newBurnRate)
                 end
             end
             

@@ -111,6 +111,24 @@ function ui.drawReactorStatus(x, y, reactorId, reactor)
     monitor.setCursorPos(x + 2, y + 4)
     monitor.write(string.format("Burn:    %4.1f mB/t", reactor.burn_rate or 0))
     
+    -- Add burn rate control buttons if reactor is active
+    if reactor.active then
+        -- Decrease button
+        monitor.setCursorPos(x + boxWidth - 8, y + 4)
+        monitor.setBackgroundColor(config.colors.warning)
+        monitor.setTextColor(config.colors.background)
+        monitor.write(" - ")
+        
+        -- Increase button  
+        monitor.setCursorPos(x + boxWidth - 4, y + 4)
+        monitor.setBackgroundColor(config.colors.good)
+        monitor.setTextColor(config.colors.background)
+        monitor.write(" + ")
+        
+        monitor.setBackgroundColor(config.colors.background)
+        monitor.setTextColor(config.colors.text)
+    end
+    
     if y + 5 < y + boxHeight - 1 then
         monitor.setCursorPos(x + 2, y + 5)
         local fuelColor = reactor.fuel_percent < 20 and config.colors.warning or config.colors.text
@@ -148,12 +166,20 @@ function ui.drawReactorStatus(x, y, reactorId, reactor)
     
     monitor.setTextColor(config.colors.text)
     
-    return {
+    local buttons = {
         reactorId = reactorId,
         toggleButton = {x = x + 2, y = buttonY, width = 7, height = 1},
         active = reactor.active,
         burnRate = reactor.burn_rate
     }
+    
+    -- Add burn rate control buttons if reactor is active
+    if reactor.active then
+        buttons.decreaseBurnButton = {x = x + boxWidth - 8, y = y + 4, width = 3, height = 1}
+        buttons.increaseBurnButton = {x = x + boxWidth - 4, y = y + 4, width = 3, height = 1}
+    end
+    
+    return buttons
 end
 
 function ui.drawBatteryStatus(x, y, battery)
