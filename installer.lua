@@ -251,8 +251,7 @@ local function installComponent(component, privateKey)
         files = {
             "shared/network.lua",
             "shared/protocol.lua",
-            "reactor/main.lua",
-            "reactor/reactor_api.lua"
+            "reactor/main.lua"
         }
         
         config = {

@@ -1,12 +1,195 @@
 local network = dofile("/reactor_control/shared/network.lua")
 local protocol = dofile("/reactor_control/shared/protocol.lua")
-local reactor_api = dofile("/reactor_control/reactor/reactor_api.lua")
 
 local config = dofile("/reactor_control/reactor/config.lua")
 
 local running = true
 local lastEmergencyCheck = 0
 
+-- Reactor API variables
+local reactor = nil
+local side = nil
+
+-- Reactor API functions
+local function findReactor()
+    local peripherals = peripheral.getNames()
+    
+    for _, name in ipairs(peripherals) do
+        local pType = peripheral.getType(name)
+        if pType == "fissionReactor" or pType == "fissionReactorLogicAdapter" then
+            reactor = peripheral.wrap(name)
+            side = name
+            print("Found fission reactor on: " .. name)
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function initializeReactor()
+    if not findReactor() then
+        error("No fission reactor found! Please connect a Mekanism Fission Reactor")
+    end
+    
+    return true
+end
+
+local function isActive()
+    if not reactor then return false end
+    return reactor.getStatus()
+end
+
+local function activate()
+    if not reactor then return false end
+    if isActive() then return true end
+    reactor.activate()
+    return true
+end
+
+local function scram()
+    if not reactor then return false end
+    reactor.scram()
+    return true
+end
+
+local function getBurnRate()
+    if not reactor then return 0 end
+    return reactor.getBurnRate()
+end
+
+local function getActualBurnRate()
+    if not reactor then return 0 end
+    return reactor.getActualBurnRate()
+end
+
+local function setBurnRate(rate)
+    if not reactor then return false end
+    reactor.setBurnRate(rate)
+    return true
+end
+
+local function getMaxBurnRate()
+    if not reactor then return 0 end
+    return reactor.getMaxBurnRate()
+end
+
+local function getTemperature()
+    if not reactor then return 0 end
+    return reactor.getTemperature()
+end
+
+local function getDamagePercent()
+    if not reactor then return 0 end
+    return reactor.getDamagePercent()
+end
+
+local function getBoilEfficiency()
+    if not reactor then return 0 end
+    return reactor.getBoilEfficiency()
+end
+
+local function getHeatCapacity()
+    if not reactor then return 0 end
+    return reactor.getHeatCapacity()
+end
+
+local function getFuelCapacity()
+    if not reactor then return 0 end
+    return reactor.getFuelCapacity()
+end
+
+local function getFuelAmount()
+    if not reactor then return 0 end
+    return reactor.getFuelAmount()
+end
+
+local function getFuelPercent()
+    if not reactor then return 0 end
+    local capacity = getFuelCapacity()
+    if capacity == 0 then return 0 end
+    return (getFuelAmount() / capacity) * 100
+end
+
+local function getWasteCapacity()
+    if not reactor then return 0 end
+    return reactor.getWasteCapacity()
+end
+
+local function getWasteAmount()
+    if not reactor then return 0 end
+    return reactor.getWasteAmount()
+end
+
+local function getWastePercent()
+    if not reactor then return 0 end
+    local capacity = getWasteCapacity()
+    if capacity == 0 then return 0 end
+    return (getWasteAmount() / capacity) * 100
+end
+
+local function getCoolantCapacity()
+    if not reactor then return 0 end
+    return reactor.getCoolantCapacity()
+end
+
+local function getCoolantAmount()
+    if not reactor then return 0 end
+    return reactor.getCoolantAmount()
+end
+
+local function getCoolantPercent()
+    if not reactor then return 0 end
+    local capacity = getCoolantCapacity()
+    if capacity == 0 then return 0 end
+    return (getCoolantAmount() / capacity) * 100
+end
+
+local function getHeatedCoolantCapacity()
+    if not reactor then return 0 end
+    return reactor.getHeatedCoolantCapacity()
+end
+
+local function getHeatedCoolantAmount()
+    if not reactor then return 0 end
+    return reactor.getHeatedCoolantAmount()
+end
+
+local function getHeatedCoolantPercent()
+    if not reactor then return 0 end
+    local capacity = getHeatedCoolantCapacity()
+    if capacity == 0 then return 0 end
+    return (getHeatedCoolantAmount() / capacity) * 100
+end
+
+local function getStats()
+    if not reactor then return nil end
+    
+    return {
+        active = isActive(),
+        temperature = getTemperature(),
+        damage = getDamagePercent(),
+        burnRate = getBurnRate(),
+        actualBurnRate = getActualBurnRate(),
+        maxBurnRate = getMaxBurnRate(),
+        boilEfficiency = getBoilEfficiency(),
+        heatCapacity = getHeatCapacity(),
+        fuelAmount = getFuelAmount(),
+        fuelCapacity = getFuelCapacity(),
+        fuelPercent = getFuelPercent(),
+        wasteAmount = getWasteAmount(),
+        wasteCapacity = getWasteCapacity(),
+        wastePercent = getWastePercent(),
+        coolantAmount = getCoolantAmount(),
+        coolantCapacity = getCoolantCapacity(),
+        coolantPercent = getCoolantPercent(),
+        heatedCoolantAmount = getHeatedCoolantAmount(),
+        heatedCoolantCapacity = getHeatedCoolantCapacity(),
+        heatedCoolantPercent = getHeatedCoolantPercent()
+    }
+end
+
+-- Main reactor controller functions
 local function init()
     term.clear()
     term.setCursorPos(1, 1)
@@ -14,8 +197,8 @@ local function init()
     print("Reactor ID: " .. config.reactor_id)
     print("Initializing...")
     
-    if not reactor_api.initialize() then
-        error("Failed to initialize reactor API")
+    if not initializeReactor() then
+        error("Failed to initialize reactor")
     end
     
     network.init(nil, {config.server_channel, config.broadcast_channel}, config.privateKey)
@@ -34,7 +217,7 @@ local function checkEmergency(stats)
         print("Damage: " .. stats.damage .. "%")
         print("Waste: " .. stats.wastePercent .. "%")
         
-        reactor_api.scram()
+        scram()
         
         local alert = network.createMessage(
             protocol.messageTypes.BROADCAST,
@@ -54,7 +237,7 @@ local function checkEmergency(stats)
 end
 
 local function sendReactorStatus()
-    local stats = reactor_api.getStats()
+    local stats = getStats()
     if not stats then
         return
     end
@@ -85,16 +268,16 @@ local function handleReactorControl(message)
     local result = "Unknown action"
     
     if data.action == protocol.reactorActions.ACTIVATE then
-        success = reactor_api.activate()
+        success = activate()
         result = success and "Reactor activated" or "Failed to activate"
     elseif data.action == protocol.reactorActions.SCRAM then
-        success = reactor_api.scram()
+        success = scram()
         result = success and "Reactor scrammed" or "Failed to scram"
     elseif data.action == protocol.reactorActions.SET_BURN_RATE then
-        success = reactor_api.setBurnRate(data.value or 0)
+        success = setBurnRate(data.value or 0)
         result = success and "Burn rate set to " .. (data.value or 0) or "Failed to set burn rate"
     elseif data.action == "adjust_burn" then
-        success = reactor_api.setBurnRate(data.value or 0)
+        success = setBurnRate(data.value or 0)
         result = success and "Burn rate adjusted to " .. (data.value or 0) or "Failed to adjust burn rate"
     end
     
@@ -110,7 +293,7 @@ local function sendHeartbeat()
     local heartbeat = protocol.createHeartbeat(
         "reactor",
         config.reactor_id,
-        reactor_api.isActive() and "active" or "idle"
+        isActive() and "active" or "idle"
     )
     
     local message = network.createMessage(
@@ -127,7 +310,7 @@ local function displayStatus()
         return
     end
     
-    local stats = reactor_api.getStats()
+    local stats = getStats()
     if not stats then
         return
     end
@@ -197,17 +380,17 @@ local function main()
                 running = false
             elseif p1 == keys.e then
                 print("\nEmergency shutdown!")
-                reactor_api.scram()
+                scram()
             end
         end
     end
     
     print("\nShutting down controller...")
-    reactor_api.scram()
+    scram()
 end
 
 local success, err = pcall(main)
 if not success then
     print("Controller error: " .. tostring(err))
-    reactor_api.scram()
+    scram()
 end
