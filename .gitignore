@@ -1,0 +1,29 @@
+# Data files
+*.dat
+data_history.dat
+
+# Log files
+*.log
+server.log
+
+# Backup and temp files
+*.bak
+*.tmp
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Test files
+test/
+tests/
+
+# Local config overrides
+*.local.lua
+config.local/

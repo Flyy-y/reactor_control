@@ -1,0 +1,24 @@
+print("Starting Reactor Control Server...")
+
+if fs.exists("/reactor_control/updater.lua") then
+    os.loadAPI("/reactor_control/updater.lua")
+    
+    updater.setConfig({
+        github_user = "Flyy-y",
+        github_repo = "reactor_control",
+        branch = "main",
+        files = {
+            "shared/network.lua",
+            "shared/protocol.lua",
+            "server/main.lua",
+            "server/rules.lua",
+            "server/storage.lua",
+            "server/config.lua"
+        }
+    })
+    
+    print("Checking for updates...")
+    updater.checkAndUpdate()
+end
+
+shell.run("/reactor_control/server/main.lua")
