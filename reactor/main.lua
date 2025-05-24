@@ -243,6 +243,10 @@ local function init()
         error("Failed to initialize reactor")
     end
     
+    -- Safety: SCRAM reactor on startup in case controller crashed while reactor was running
+    print("Safety SCRAM on startup...")
+    scram()
+    
     network.init(nil, {config.server_channel, config.broadcast_channel})
     
     print("Controller ready")
