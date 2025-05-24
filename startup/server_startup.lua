@@ -1,7 +1,7 @@
 print("Starting Reactor Control Server...")
 
 if fs.exists("/reactor_control/updater.lua") then
-    os.loadAPI("/reactor_control/updater.lua")
+    local updater = dofile("/reactor_control/updater.lua")
     
     updater.setConfig({
         github_user = "Flyy-y",
@@ -20,5 +20,9 @@ if fs.exists("/reactor_control/updater.lua") then
     print("Checking for updates...")
     updater.checkAndUpdate()
 end
+
+-- Wait 5 seconds before starting
+print("Waiting 5 seconds before starting...")
+sleep(5)
 
 shell.run("/reactor_control/server/main.lua")

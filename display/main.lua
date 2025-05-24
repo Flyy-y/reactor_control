@@ -104,65 +104,23 @@ local function sendReactorControl(reactorId, action, value)
 end
 
 local function drawDisplay()
-    ui.clear()
-    ui.drawHeader("REACTOR CONTROL SYSTEM")
+    -- Use compact display for 8x4 monitor
+    ui.drawCompactDisplay(systemStatus, alerts)
     
-    local w, h = ui.getSize()
-    
+    -- Store button info for first reactor
     reactorButtons = {}
-    
-    if systemStatus then
-        local reactorX = 2
-        local reactorY = 3
-        local reactorCount = 0
-        
-        for reactorId, reactor in pairs(systemStatus.reactors or {}) do
-            local buttons = ui.drawReactorStatus(reactorX, reactorY, reactorId, reactor)
+    if systemStatus and systemStatus.reactors then
+        local reactorId, reactor = next(systemStatus.reactors)
+        if reactorId and reactor then
+            local buttons = {
+                reactorId = reactorId,
+                toggleButton = {x = 1, y = 2, width = 4, height = 3},
+                active = reactor.active,
+                burnRate = reactor.burn_rate
+            }
             table.insert(reactorButtons, buttons)
-            
-            reactorX = reactorX + 27
-            reactorCount = reactorCount + 1
-            
-            if reactorCount % 2 == 0 then
-                reactorX = 2
-                reactorY = reactorY + 13
-            end
         end
-        
-        local batteryY = 3
-        if reactorCount > 0 then
-            batteryY = math.max(16, reactorY)
-        end
-        
-        ui.drawBatteryStatus(2, batteryY, systemStatus.battery)
-        
-        -- Draw control panel
-        controlPanelButtons = ui.drawControlPanel(35, batteryY)
-        
-        if config.display.show_graphs and w > 80 then
-            local graphX = math.max(56, reactorX)
-            
-            if temperatureHistory[1] and #temperatureHistory[1] > 1 then
-                ui.drawGraph(graphX, 3, 30, 10, temperatureHistory[1], "Reactor 1 Temp", "K")
-            end
-            
-            if #batteryHistory > 1 then
-                ui.drawGraph(graphX, 14, 30, 10, batteryHistory, "Battery Level", "%")
-            end
-        end
-        
-        if config.display.show_alerts then
-            ui.drawAlerts(30, batteryY, alerts)
-        end
-    else
-        ui.getMonitor().setCursorPos(2, 3)
-        ui.getMonitor().write("Waiting for data...")
     end
-    
-    ui.getMonitor().setCursorPos(1, h)
-    ui.getMonitor().setTextColor(colors.gray)
-    ui.getMonitor().write("Updated: " .. ui.formatTime(os.epoch("utc")))
-    ui.getMonitor().setTextColor(colors.white)
 end
 
 local function main()
@@ -192,35 +150,16 @@ local function main()
         elseif event == "monitor_touch" then
             local x, y = p2, p3
             
-            -- Check reactor buttons
-            for _, buttons in ipairs(reactorButtons) do
-                if ui.isButtonClicked(buttons.toggleButton, x, y) then
+            -- Simple touch handling for 8x4 display
+            -- Touching the reactor area (left side) toggles the reactor
+            if x <= 4 and y >= 2 then
+                for _, buttons in ipairs(reactorButtons) do
                     if buttons.active then
                         sendReactorControl(buttons.reactorId, "scram")
                     else
                         sendReactorControl(buttons.reactorId, "activate")
                     end
-                elseif ui.isButtonClicked(buttons.decreaseButton, x, y) then
-                    local newRate = math.max(0, (buttons.burnRate or 0) - 1)
-                    sendReactorControl(buttons.reactorId, "set_burn_rate", newRate)
-                elseif ui.isButtonClicked(buttons.increaseButton, x, y) then
-                    local newRate = (buttons.burnRate or 0) + 1
-                    sendReactorControl(buttons.reactorId, "set_burn_rate", newRate)
-                end
-            end
-            
-            -- Check control panel buttons
-            if controlPanelButtons then
-                if ui.isButtonClicked(controlPanelButtons.scramAllButton, x, y) then
-                    -- Send SCRAM to all reactors
-                    for reactorId, _ in pairs(systemStatus.reactors or {}) do
-                        sendReactorControl(reactorId, "scram")
-                    end
-                elseif ui.isButtonClicked(controlPanelButtons.startAllButton, x, y) then
-                    -- Send START to all reactors
-                    for reactorId, _ in pairs(systemStatus.reactors or {}) do
-                        sendReactorControl(reactorId, "activate")
-                    end
+                    break -- Only handle first reactor
                 end
             end
             

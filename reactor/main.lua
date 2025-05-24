@@ -115,13 +115,10 @@ end
 
 local function getFuelPercent()
     if not reactor then return 0 end
-    if reactor.getFuelFilledPercentage then
-        return reactor.getFuelFilledPercentage()
-    else
-        local capacity = getFuelCapacity()
-        if capacity == 0 then return 0 end
-        return (getFuelAmount() / capacity) * 100
-    end
+    local capacity = getFuelCapacity()
+    local amount = getFuelAmount()
+    if capacity == 0 then return 0 end
+    return (amount / capacity) * 100
 end
 
 local function getWasteCapacity()
@@ -145,13 +142,10 @@ end
 
 local function getWastePercent()
     if not reactor then return 0 end
-    if reactor.getWasteFilledPercentage then
-        return reactor.getWasteFilledPercentage()
-    else
-        local capacity = getWasteCapacity()
-        if capacity == 0 then return 0 end
-        return (getWasteAmount() / capacity) * 100
-    end
+    local capacity = getWasteCapacity()
+    local amount = getWasteAmount()
+    if capacity == 0 then return 0 end
+    return (amount / capacity) * 100
 end
 
 local function getCoolantCapacity()
@@ -175,13 +169,10 @@ end
 
 local function getCoolantPercent()
     if not reactor then return 0 end
-    if reactor.getCoolantFilledPercentage then
-        return reactor.getCoolantFilledPercentage()
-    else
-        local capacity = getCoolantCapacity()
-        if capacity == 0 then return 0 end
-        return (getCoolantAmount() / capacity) * 100
-    end
+    local capacity = getCoolantCapacity()
+    local amount = getCoolantAmount()
+    if capacity == 0 then return 0 end
+    return (amount / capacity) * 100
 end
 
 local function getHeatedCoolantCapacity()
@@ -205,13 +196,10 @@ end
 
 local function getHeatedCoolantPercent()
     if not reactor then return 0 end
-    if reactor.getHeatedCoolantFilledPercentage then
-        return reactor.getHeatedCoolantFilledPercentage()
-    else
-        local capacity = getHeatedCoolantCapacity()
-        if capacity == 0 then return 0 end
-        return (getHeatedCoolantAmount() / capacity) * 100
-    end
+    local capacity = getHeatedCoolantCapacity()
+    local amount = getHeatedCoolantAmount()
+    if capacity == 0 then return 0 end
+    return (amount / capacity) * 100
 end
 
 local function getStats()
@@ -376,12 +364,16 @@ local function displayStatus()
         stats.temperature, stats.actualBurnRate, stats.burnRate))
     
     term.clearLine()
-    print(string.format("Fuel: %.1f%%  Waste: %.1f%%", 
-        stats.fuelPercent, stats.wastePercent))
+    print(string.format("Fuel: %.1f%% (%d/%d)", 
+        stats.fuelPercent, stats.fuelAmount, stats.fuelCapacity))
     
     term.clearLine()
-    print(string.format("Coolant: %.1f%%  Heated: %.1f%%", 
-        stats.coolantPercent, stats.heatedCoolantPercent))
+    print(string.format("Waste: %.1f%% (%d/%d)", 
+        stats.wastePercent, stats.wasteAmount, stats.wasteCapacity))
+    
+    term.clearLine()
+    print(string.format("Coolant: %.1f%% (%d/%d)", 
+        stats.coolantPercent, stats.coolantAmount, stats.coolantCapacity))
     
     term.clearLine()
     print(string.format("Damage: %.2f%%  Efficiency: %.1f%%", 
