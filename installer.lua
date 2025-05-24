@@ -375,35 +375,31 @@ local function installComponent(component, privateKey)
     print("\nWriting configuration...")
     writeConfig(configPath, config)
     
-    -- Create startup file
-    local startupContent = ""
+    -- Download and use the appropriate startup file
+    local startupFile = ""
     if component == "Server" then
-        startupContent = [[
-print("Starting Reactor Control Server...")
-shell.run("/reactor_control/server/main.lua")
-]]
+        startupFile = "startup/server_startup.lua"
     elseif component == "Reactor Controller" then
-        startupContent = [[
-print("Starting Reactor Controller...")
-shell.run("/reactor_control/reactor/main.lua")
-]]
+        startupFile = "startup/reactor_startup.lua"
     elseif component == "Battery Controller" then
-        startupContent = [[
-print("Starting Battery Controller...")
-shell.run("/reactor_control/battery/main.lua")
-]]
+        startupFile = "startup/battery_startup.lua"
     elseif component == "Display" then
-        startupContent = [[
-print("Starting Display...")
-shell.run("/reactor_control/display/main.lua")
-]]
+        startupFile = "startup/display_startup.lua"
     end
     
-    -- Always create startup file
-    print("\nCreating startup file...")
-    local file = fs.open("/startup.lua", "w")
-    file.write(startupContent)
-    file.close()
+    -- Download the startup file
+    print("\nDownloading startup file...")
+    local startupUrl = getGithubUrl(startupFile)
+    local startupDest = "/reactor_control/" .. startupFile
+    
+    if not downloadFile(startupUrl, startupDest) then
+        print("Failed to download startup file!")
+        return false
+    end
+    
+    -- Always create startup file by copying the downloaded one
+    print("Creating startup file...")
+    fs.copy(startupDest, "/startup.lua")
     print("Startup file created.")
     
     return true
