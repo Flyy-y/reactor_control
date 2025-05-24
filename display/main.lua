@@ -46,6 +46,8 @@ local function requestSystemStatus()
         print("Got system status update")
     else
         print("Failed to get system status: " .. tostring(response))
+        -- Don't clear systemStatus, keep showing last known data
+        return
     end
     
     if systemStatus then
@@ -90,6 +92,11 @@ local function handleAlert(message)
     while #alerts > config.display.max_alerts * 2 do
         table.remove(alerts, 1)
     end
+end
+
+local function handlePing(message, channel)
+    -- Acknowledge server ping
+    print("Received server ping")
 end
 
 local function sendReactorControl(reactorId, action, value)
@@ -164,6 +171,7 @@ local function main()
     init()
     
     network.on(protocol.commands.ALERT, handleAlert)
+    network.on(protocol.commands.HEARTBEAT, handlePing)
     
     local updateTimer = os.startTimer(config.update_interval)
     local requestTimer = os.startTimer(0.1)

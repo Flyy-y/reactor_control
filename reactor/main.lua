@@ -349,9 +349,6 @@ local function handleReactorControl(message)
     elseif data.action == protocol.reactorActions.SET_BURN_RATE then
         success = setBurnRate(data.value or 0)
         result = success and "Burn rate set to " .. (data.value or 0) or "Failed to set burn rate"
-    elseif data.action == "adjust_burn" then
-        success = setBurnRate(data.value or 0)
-        result = success and "Burn rate adjusted to " .. (data.value or 0) or "Failed to adjust burn rate"
     end
     
     print("[Control] " .. result)

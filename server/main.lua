@@ -73,6 +73,14 @@ local function handleDisplayRequest(message, channel)
     
     if requestType == "system_status" then
         response = rules.getSystemStatus()
+        -- Always ensure we have a response, even if components are not responding
+        if not response then
+            response = {
+                reactors = {},
+                battery = nil,
+                timestamp = os.epoch("utc")
+            }
+        end
     elseif requestType == "reactor_history" then
         response = storage.getReactorHistory(
             message.data.reactor_id,
@@ -172,7 +180,7 @@ local function checkAndSendAlerts()
     end
 end
 
-local function pingReactors()
+local function pingComponents()
     -- Send ping to all known reactors to maintain contact
     local status = rules.getSystemStatus()
     for reactorId, reactor in pairs(status.reactors or {}) do
@@ -190,12 +198,38 @@ local function pingReactors()
             network.send(reactorChannel, pingMsg)
         end
     end
+    
+    -- Also ping the battery controller
+    if status.battery then
+        local batteryPingMsg = network.createMessage(
+            protocol.messageTypes.REQUEST,
+            protocol.commands.HEARTBEAT,
+            {
+                type = "ping",
+                timestamp = os.epoch("utc")
+            }
+        )
+        network.send(config.battery_channel, batteryPingMsg)
+    end
+    
+    -- Ping display controllers too
+    for _, displayChannel in ipairs(config.display_channels) do
+        local displayPingMsg = network.createMessage(
+            protocol.messageTypes.REQUEST,
+            protocol.commands.HEARTBEAT,
+            {
+                type = "ping",
+                timestamp = os.epoch("utc")
+            }
+        )
+        network.send(displayChannel, displayPingMsg)
+    end
 end
 
 local function periodicTasks()
     checkAndSendAlerts()
     optimizeBurnRates()  -- Add burn rate optimization
-    pingReactors()  -- Ping reactors to maintain contact
+    pingComponents()  -- Ping reactors and battery to maintain contact
     
     local health = rules.checkComponentHealth(config)
     for component, isHealthy in pairs(health.reactors) do

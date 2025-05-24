@@ -61,23 +61,40 @@ local function checkAlerts(stats)
 end
 
 local function sendBatteryStatus()
-    local stats = battery_api.getStats()
-    if not stats then
-        print("Failed to get battery stats")
+    local success, stats = pcall(battery_api.getStats)
+    if not success then
+        print("Error getting battery stats: " .. tostring(stats))
         return
     end
     
-    checkAlerts(stats)
+    if not stats then
+        print("Failed to get battery stats - no data returned")
+        return
+    end
     
-    local status = protocol.createBatteryStatus(stats)
+    local alertSuccess, alertError = pcall(checkAlerts, stats)
+    if not alertSuccess then
+        print("Error checking alerts: " .. tostring(alertError))
+    end
+    
+    local protocolSuccess, status = pcall(protocol.createBatteryStatus, stats)
+    if not protocolSuccess then
+        print("Error creating battery status: " .. tostring(status))
+        return
+    end
+    
     local message = network.createMessage(
         protocol.messageTypes.BROADCAST,
         protocol.commands.BATTERY_STATUS,
         status
     )
     
-    network.send(config.server_channel, message)
-    print(string.format("Sent battery status: %.1f%%", stats.energyPercent))
+    local sendSuccess, sendError = pcall(network.send, config.server_channel, message)
+    if sendSuccess then
+        print(string.format("Sent battery status: %.1f%%", stats.energyPercent))
+    else
+        print("Error sending battery status: " .. tostring(sendError))
+    end
 end
 
 local function sendHeartbeat()
@@ -153,9 +170,15 @@ local function displayStatus()
         stats.cells, stats.providers))
 end
 
+local function handlePing(message, channel)
+    -- Just acknowledge the ping - battery doesn't need timeout protection like reactors
+    print("Received server ping")
+end
 
 local function main()
     init()
+    
+    network.on(protocol.commands.HEARTBEAT, handlePing)
     
     local statusTimer = os.startTimer(config.update_interval)
     local heartbeatTimer = os.startTimer(config.heartbeat_interval)
