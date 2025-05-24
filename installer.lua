@@ -252,7 +252,7 @@ local function installComponent(component, privateKey)
             "shared/network.lua",
             "shared/protocol.lua",
             "reactor/main.lua",
-            "reactor_api.lua"
+            "reactor/reactor_api.lua"
         }
         
         config = {
