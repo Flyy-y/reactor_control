@@ -6,6 +6,8 @@ local config = dofile("/reactor_control/battery/config.lua")
 
 local running = true
 local lastAlertLevel = nil
+local lastSuccessfulSend = os.epoch("utc")
+local failureCount = 0
 
 local function init()
     term.clear()
@@ -92,8 +94,23 @@ local function sendBatteryStatus()
     local sendSuccess, sendError = pcall(network.send, config.server_channel, message)
     if sendSuccess then
         print(string.format("Sent battery status: %.1f%%", stats.energyPercent))
+        lastSuccessfulSend = os.epoch("utc")
+        failureCount = 0
     else
         print("Error sending battery status: " .. tostring(sendError))
+        failureCount = failureCount + 1
+        
+        -- If we've failed too many times, try to reinitialize
+        if failureCount >= 5 then
+            print("Too many failures, attempting to reinitialize...")
+            local initSuccess, initError = pcall(battery_api.initialize)
+            if initSuccess then
+                print("Battery API reinitialized successfully")
+                failureCount = 0
+            else
+                print("Failed to reinitialize battery API: " .. tostring(initError))
+            end
+        end
     end
 end
 
@@ -183,6 +200,7 @@ local function main()
     local statusTimer = os.startTimer(config.update_interval)
     local heartbeatTimer = os.startTimer(config.heartbeat_interval)
     local displayTimer = os.startTimer(config.display.update_interval)
+    local watchdogTimer = os.startTimer(30)  -- Check every 30 seconds
     
     sendBatteryStatus()
     sendHeartbeat()
@@ -194,14 +212,41 @@ local function main()
             network.handleModemMessage(p1, p2, p3, p4, p5)
         elseif event == "timer" then
             if p1 == statusTimer then
-                sendBatteryStatus()
+                local success, error = pcall(sendBatteryStatus)
+                if not success then
+                    print("Error in sendBatteryStatus: " .. tostring(error))
+                end
                 statusTimer = os.startTimer(config.update_interval)
             elseif p1 == heartbeatTimer then
-                sendHeartbeat()
+                local success, error = pcall(sendHeartbeat)
+                if not success then
+                    print("Error in sendHeartbeat: " .. tostring(error))
+                end
                 heartbeatTimer = os.startTimer(config.heartbeat_interval)
             elseif p1 == displayTimer then
-                displayStatus()
+                local success, error = pcall(displayStatus)
+                if not success then
+                    print("Error in displayStatus: " .. tostring(error))
+                end
                 displayTimer = os.startTimer(config.display.update_interval)
+            elseif p1 == watchdogTimer then
+                -- Check if we haven't sent status in too long
+                local timeSinceLastSend = (os.epoch("utc") - lastSuccessfulSend) / 1000
+                if timeSinceLastSend > 60 then  -- 60 seconds without successful send
+                    print("WATCHDOG: No successful status sent in " .. math.floor(timeSinceLastSend) .. " seconds")
+                    print("Attempting recovery...")
+                    
+                    -- Try to reinitialize everything
+                    local initSuccess, initError = pcall(battery_api.initialize)
+                    if initSuccess then
+                        print("Battery API reinitialized")
+                        lastSuccessfulSend = os.epoch("utc")
+                        failureCount = 0
+                    else
+                        print("Recovery failed: " .. tostring(initError))
+                    end
+                end
+                watchdogTimer = os.startTimer(30)
             end
         elseif event == "key" and p1 == keys.q then
             running = false
