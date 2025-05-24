@@ -60,6 +60,26 @@ function updater.checkAndUpdate()
         end
     end
     
+    -- Also update the updater itself
+    print("  Downloading: /reactor_control/updater.lua")
+    local updaterUrl = getGithubUrl("updater.lua")
+    local tempPath = "/reactor_control/updater_new.lua"
+    local response = http.get(updaterUrl)
+    if response then
+        local content = response.readAll()
+        response.close()
+        local file = fs.open(tempPath, "w")
+        file.write(content)
+        file.close()
+        -- Replace updater after all other files are done
+        fs.delete("/reactor_control/updater.lua")
+        fs.move(tempPath, "/reactor_control/updater.lua")
+        print("  Success: updater.lua updated")
+    else
+        print("  Failed: updater.lua")
+        allSuccess = false
+    end
+    
     if allSuccess then
         print("All files updated successfully!")
         
