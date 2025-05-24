@@ -288,28 +288,6 @@ local function setupHandlers()
     network.on(protocol.commands.REACTOR_CONTROL, handleReactorControl)
 end
 
-local function checkForUpdates()
-    if not fs.exists("/reactor_control/updater.lua") then
-        return
-    end
-    
-    local updater = dofile("/reactor_control/updater.lua")
-    updater.setConfig({
-        github_user = "Flyy-y",
-        github_repo = "reactor_control",
-        branch = "main",
-        files = {
-            "shared/network.lua",
-            "shared/protocol.lua",
-            "server/main.lua",
-            "server/rules.lua",
-            "server/storage.lua"
-        }
-    })
-    
-    -- This will check and update, then reboot if updates were found
-    updater.checkAndUpdate()
-end
 
 local function main()
     init()
@@ -317,7 +295,6 @@ local function main()
     
     local updateTimer = os.startTimer(config.update_interval)
     local displayTimer = os.startTimer(1)
-    local updateCheckTimer = os.startTimer(60)  -- Check for updates every 60 seconds
     
     while true do
         local event, p1, p2, p3, p4, p5 = os.pullEvent()
@@ -331,10 +308,6 @@ local function main()
             elseif p1 == displayTimer then
                 displayStatus()
                 displayTimer = os.startTimer(1)
-            elseif p1 == updateCheckTimer then
-                storage.log("Checking for updates...")
-                checkForUpdates()
-                updateCheckTimer = os.startTimer(60)
             end
         elseif event == "key" and p1 == keys.q then
             storage.log("Server shutdown by user")
