@@ -4,19 +4,23 @@ local monitor = nil
 local width, height = 0, 0
 local config = nil
 
--- Helper function to format RF values
-local function formatRF(value)
-    local absValue = math.abs(value)
-    local sign = value < 0 and "-" or value > 0 and "+" or ""
+-- Helper function to format energy values (MJ to FE conversion: 1 MJ = 0.4 FE)
+local function formatEnergy(mjValue)
+    -- Convert MJ/t to FE/t (1 MJ = 0.4 FE)
+    local feValue = mjValue * 0.4
+    local absValue = math.abs(feValue)
+    local sign = feValue < 0 and "-" or feValue > 0 and "+" or ""
     
-    if absValue >= 1e9 then
-        return string.format("%s%.1fG", sign, absValue / 1e9)
+    if absValue >= 1e12 then
+        return string.format("%s%.1fT FE/t", sign, absValue / 1e12)
+    elseif absValue >= 1e9 then
+        return string.format("%s%.1fG FE/t", sign, absValue / 1e9)
     elseif absValue >= 1e6 then
-        return string.format("%s%.1fM", sign, absValue / 1e6)
+        return string.format("%s%.1fM FE/t", sign, absValue / 1e6)
     elseif absValue >= 1e3 then
-        return string.format("%s%.1fK", sign, absValue / 1e3)
+        return string.format("%s%.1fK FE/t", sign, absValue / 1e3)
     else
-        return string.format("%s%.0f", sign, absValue)
+        return string.format("%s%.0f FE/t", sign, absValue)
     end
 end
 
@@ -135,7 +139,7 @@ function ui.drawReactorStatus(x, y, reactorId, reactor, pendingAction)
     
     monitor.setTextColor(config.colors.text)
     monitor.setCursorPos(x + 2, y + 4)
-    monitor.write(string.format("Burn:    %4.1f mB/t", reactor.burn_rate or 0))
+    monitor.write(string.format("Burn:    %.1f mB/t", reactor.burn_rate or 0))
     
     -- Add burn rate control buttons if reactor is active
     if reactor.active then
@@ -260,17 +264,17 @@ function ui.drawBatteryStatus(x, y, battery)
     local netFlow = battery.input_rate - battery.output_rate
     local flowColor = netFlow > 0 and config.colors.good or config.colors.warning
     monitor.setTextColor(flowColor)
-    monitor.write(string.format("Net: %s RF/t", formatRF(netFlow)))
+    monitor.write(string.format("Net: %s", formatEnergy(netFlow)))
     
     if y + 4 < y + boxHeight - 1 then
         monitor.setTextColor(config.colors.text)
         monitor.setCursorPos(x + 2, y + 4)
-        monitor.write(string.format("In:  %s RF/t", formatRF(battery.input_rate)))
+        monitor.write(string.format("In:  %s", formatEnergy(battery.input_rate)))
     end
     
     if y + 5 < y + boxHeight - 1 then
         monitor.setCursorPos(x + 2, y + 5)
-        monitor.write(string.format("Out: %s RF/t", formatRF(battery.output_rate)))
+        monitor.write(string.format("Out: %s", formatEnergy(battery.output_rate)))
     end
 end
 
