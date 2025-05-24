@@ -97,29 +97,14 @@ function rules.getReactorDecision(reactorId, config)
             decision.reason = "Reactor offline - " .. reason
         end
     else
-        if not reactor.active and config.auto_control.enabled then
-            decision.action = "activate"
-            decision.burn_rate = config.auto_control.min_burn_rate
-            decision.reason = "Starting reactor - all conditions met"
-        elseif reactor.active and config.auto_control.enabled then
-            decision.action = "adjust_burn"
-            decision.burn_rate = rules.calculateOptimalBurnRate(reactorId, config)
-            decision.reason = "Optimizing burn rate"
-        else
-            decision.action = "none"
-            decision.reason = "Reactor operating normally"
-        end
+        decision.action = "none"
+        decision.reason = "Reactor operating normally"
     end
     
     lastDecisions[reactorId] = decision
     return decision
 end
 
-function rules.calculateOptimalBurnRate(reactorId, config)
-    -- This function is deprecated - burn rate optimization is now handled
-    -- by optimizeBurnRates() in server/main.lua using percentage-based control
-    return nil
-end
 
 function rules.getSystemStatus()
     local status = {
