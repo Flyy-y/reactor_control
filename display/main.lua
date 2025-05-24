@@ -11,6 +11,7 @@ local alerts = {}
 local temperatureHistory = {}
 local batteryHistory = {}
 local reactorButtons = {}
+local pendingActions = {}  -- Track pending reactor state changes
 
 local function init()
     term.clear()
@@ -43,6 +44,8 @@ local function requestSystemStatus()
     if success and response.data then
         systemStatus = response.data
         print("Got system status update")
+        -- Clear pending actions as we have fresh data
+        pendingActions = {}
     else
         print("Failed to get system status: " .. tostring(response))
         -- Don't clear systemStatus, keep showing last known data
@@ -129,7 +132,8 @@ local function drawDisplay()
         
         -- Draw reactors (up to 2 side by side)
         for reactorId, reactor in pairs(systemStatus.reactors or {}) do
-            local buttons = ui.drawReactorStatus(reactorX, reactorY, reactorId, reactor)
+            local pendingAction = pendingActions[reactorId]
+            local buttons = ui.drawReactorStatus(reactorX, reactorY, reactorId, reactor, pendingAction)
             table.insert(reactorButtons, buttons)
             
             reactorX = math.floor(w / 2) + 2
@@ -195,9 +199,13 @@ local function main()
                 if ui.isButtonClicked(buttons.toggleButton, x, y) then
                     if buttons.active then
                         sendReactorControl(buttons.reactorId, "scram")
+                        pendingActions[buttons.reactorId] = "STOPPING"
                     else
                         sendReactorControl(buttons.reactorId, "activate")
+                        pendingActions[buttons.reactorId] = "STARTING"
                     end
+                    -- Immediately redraw to show pending status
+                    drawDisplay()
                 elseif buttons.decreaseBurnButton and ui.isButtonClicked(buttons.decreaseBurnButton, x, y) then
                     -- Decrease burn rate by 1 mB/t
                     local newBurnRate = math.max(0, (buttons.burnRate or 0) - 1)
@@ -210,9 +218,8 @@ local function main()
             end
             
             
-            -- Redraw after interaction
-            os.sleep(0.1)
-            requestSystemStatus()
+            -- Request immediate update without blocking
+            requestTimer = os.startTimer(0.1)
         end
     end
     

@@ -87,7 +87,7 @@ function ui.drawBox(x, y, w, h, title)
     monitor.setTextColor(config.colors.text)
 end
 
-function ui.drawReactorStatus(x, y, reactorId, reactor)
+function ui.drawReactorStatus(x, y, reactorId, reactor, pendingAction)
     -- Calculate dynamic box size based on available space
     local boxWidth = math.floor(width / 2) - 2
     local boxHeight = math.floor((height - 3) / 2)
@@ -116,6 +116,12 @@ function ui.drawReactorStatus(x, y, reactorId, reactor)
     
     local statusColor = reactor.active and config.colors.active or config.colors.inactive
     local statusText = reactor.active and "ONLINE" or "OFFLINE"
+    
+    -- Override with pending action if present
+    if pendingAction then
+        statusText = pendingAction
+        statusColor = config.colors.warning  -- Yellow/orange for pending
+    end
     
     monitor.setCursorPos(x + 2, y + 2)
     monitor.setTextColor(statusColor)
