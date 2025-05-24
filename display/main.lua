@@ -104,23 +104,54 @@ local function sendReactorControl(reactorId, action, value)
 end
 
 local function drawDisplay()
-    -- Use compact display for 8x4 monitor
-    ui.drawCompactDisplay(systemStatus, alerts)
+    ui.clear()
+    ui.drawHeader("REACTOR CONTROL SYSTEM")
     
-    -- Store button info for first reactor
+    local w, h = ui.getSize()
+    
     reactorButtons = {}
-    if systemStatus and systemStatus.reactors then
-        local reactorId, reactor = next(systemStatus.reactors)
-        if reactorId and reactor then
-            local buttons = {
-                reactorId = reactorId,
-                toggleButton = {x = 1, y = 2, width = 4, height = 3},
-                active = reactor.active,
-                burnRate = reactor.burn_rate
-            }
+    
+    if systemStatus then
+        local reactorX = 2
+        local reactorY = 3
+        local reactorCount = 0
+        
+        -- Draw reactors (up to 2 side by side)
+        for reactorId, reactor in pairs(systemStatus.reactors or {}) do
+            local buttons = ui.drawReactorStatus(reactorX, reactorY, reactorId, reactor)
             table.insert(reactorButtons, buttons)
+            
+            reactorX = math.floor(w / 2) + 2
+            reactorCount = reactorCount + 1
+            
+            if reactorCount >= 2 then
+                break -- Only show 2 reactors on large display
+            end
         end
+        
+        -- Battery position
+        local batteryY = math.floor(height / 2) + 2
+        ui.drawBatteryStatus(2, batteryY, systemStatus.battery)
+        
+        -- Draw control panel if space allows
+        if w > 60 then
+            controlPanelButtons = ui.drawControlPanel(math.floor(w / 2) + 2, batteryY)
+        end
+        
+        -- Alerts on the right side if space allows
+        if w > 80 then
+            ui.drawAlerts(w - 30, 3, alerts)
+        end
+    else
+        ui.getMonitor().setCursorPos(2, 3)
+        ui.getMonitor().write("Waiting for data...")
     end
+    
+    -- Show update time at bottom
+    ui.getMonitor().setCursorPos(1, h)
+    ui.getMonitor().setTextColor(colors.gray)
+    ui.getMonitor().write("Updated: " .. ui.formatTime(os.epoch("utc")))
+    ui.getMonitor().setTextColor(colors.white)
 end
 
 local function main()
@@ -150,16 +181,29 @@ local function main()
         elseif event == "monitor_touch" then
             local x, y = p2, p3
             
-            -- Simple touch handling for 8x4 display
-            -- Touching the reactor area (left side) toggles the reactor
-            if x <= 4 and y >= 2 then
-                for _, buttons in ipairs(reactorButtons) do
+            -- Check reactor buttons
+            for _, buttons in ipairs(reactorButtons) do
+                if ui.isButtonClicked(buttons.toggleButton, x, y) then
                     if buttons.active then
                         sendReactorControl(buttons.reactorId, "scram")
                     else
                         sendReactorControl(buttons.reactorId, "activate")
                     end
-                    break -- Only handle first reactor
+                end
+            end
+            
+            -- Check control panel buttons
+            if controlPanelButtons then
+                if ui.isButtonClicked(controlPanelButtons.scramAllButton, x, y) then
+                    -- Send SCRAM to all reactors
+                    for reactorId, _ in pairs(systemStatus.reactors or {}) do
+                        sendReactorControl(reactorId, "scram")
+                    end
+                elseif ui.isButtonClicked(controlPanelButtons.startAllButton, x, y) then
+                    -- Send START to all reactors
+                    for reactorId, _ in pairs(systemStatus.reactors or {}) do
+                        sendReactorControl(reactorId, "activate")
+                    end
                 end
             end
             

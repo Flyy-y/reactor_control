@@ -18,9 +18,11 @@ if fs.exists("/reactor_control/updater.lua") then
     
     print("Checking for updates...")
     updater.checkAndUpdate()
+else
+    print("Updater not found - skipping updates")
 end
 
--- Wait 5 seconds before starting
+-- Always wait 5 seconds before starting
 print("Waiting 5 seconds before starting...")
 sleep(5)
 

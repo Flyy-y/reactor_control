@@ -4,12 +4,6 @@ local monitor = nil
 local width, height = 0, 0
 local config = nil
 
--- Windows for different sections
-local headerWindow = nil
-local reactorWindow = nil
-local batteryWindow = nil
-local alertWindow = nil
-
 function ui.init(displayConfig)
     config = displayConfig
     
@@ -28,18 +22,7 @@ function ui.init(displayConfig)
     monitor.clear()
     
     width, height = monitor.getSize()
-    
-    -- Create windows for 8x4 monitor layout
-    -- Header takes top row
-    headerWindow = window.create(monitor, 1, 1, width, 1)
-    
-    -- Main content area (remaining 3 rows)
-    -- Reactor status on left (4 columns)
-    reactorWindow = window.create(monitor, 1, 2, 4, 3)
-    
-    -- Battery and alerts on right (4 columns)
-    batteryWindow = window.create(monitor, 5, 2, 4, 1)
-    alertWindow = window.create(monitor, 5, 3, 4, 2)
+    print("Monitor size: " .. width .. "x" .. height)
     
     return true
 end
@@ -50,69 +33,121 @@ function ui.clear()
 end
 
 function ui.drawHeader(title)
-    headerWindow.setBackgroundColor(config.colors.header)
-    headerWindow.setTextColor(config.colors.background)
-    headerWindow.clear()
+    monitor.setCursorPos(1, 1)
+    monitor.setBackgroundColor(config.colors.header)
+    monitor.setTextColor(config.colors.background)
+    monitor.clearLine()
     
-    -- Center the title in 8 character width
-    local padding = math.floor((8 - #title) / 2)
-    if #title > 8 then
-        title = string.sub(title, 1, 8)
+    local padding = math.floor((width - #title) / 2)
+    monitor.setCursorPos(padding, 1)
+    monitor.write(title)
+    
+    monitor.setBackgroundColor(config.colors.background)
+    monitor.setTextColor(config.colors.text)
+end
+
+function ui.drawBox(x, y, w, h, title)
+    monitor.setTextColor(config.colors.border)
+    
+    monitor.setCursorPos(x, y)
+    monitor.write("+" .. string.rep("-", w - 2) .. "+")
+    
+    for i = 1, h - 2 do
+        monitor.setCursorPos(x, y + i)
+        monitor.write("|")
+        monitor.setCursorPos(x + w - 1, y + i)
+        monitor.write("|")
     end
-    headerWindow.setCursorPos(math.max(1, padding + 1), 1)
-    headerWindow.write(title)
     
-    headerWindow.setBackgroundColor(config.colors.background)
-    headerWindow.setTextColor(config.colors.text)
+    monitor.setCursorPos(x, y + h - 1)
+    monitor.write("+" .. string.rep("-", w - 2) .. "+")
+    
+    if title then
+        monitor.setCursorPos(x + 2, y)
+        monitor.setTextColor(config.colors.header)
+        monitor.write(" " .. title .. " ")
+    end
+    
+    monitor.setTextColor(config.colors.text)
 end
 
 function ui.drawReactorStatus(x, y, reactorId, reactor)
-    -- Use the reactor window
-    reactorWindow.setBackgroundColor(config.colors.background)
-    reactorWindow.setTextColor(config.colors.text)
-    reactorWindow.clear()
+    -- Calculate dynamic box size based on available space
+    local boxWidth = math.floor(width / 2) - 2
+    local boxHeight = math.floor((height - 3) / 2)
     
-    -- Reactor ID and status (row 1)
-    reactorWindow.setCursorPos(1, 1)
-    reactorWindow.setTextColor(config.colors.header)
-    reactorWindow.write("R" .. reactorId .. ":")
+    ui.drawBox(x, y, boxWidth, boxHeight, "Reactor " .. reactorId)
     
     local statusColor = reactor.active and config.colors.active or config.colors.inactive
-    reactorWindow.setTextColor(statusColor)
-    reactorWindow.write(reactor.active and "ON" or "OFF")
+    local statusText = reactor.active and "ONLINE" or "OFFLINE"
     
-    -- Temperature and burn rate (row 2)
-    reactorWindow.setCursorPos(1, 2)
-    reactorWindow.setTextColor(config.colors.text)
-    local temp = reactor.temperature or 0
-    if temp > 1000 then
-        reactorWindow.setTextColor(config.colors.warning)
+    monitor.setCursorPos(x + 2, y + 2)
+    monitor.setTextColor(statusColor)
+    monitor.write("Status: " .. statusText)
+    
+    monitor.setTextColor(config.colors.text)
+    monitor.setCursorPos(x + 2, y + 3)
+    monitor.write(string.format("Temp: %.0fK", reactor.temperature or 0))
+    
+    monitor.setCursorPos(x + 2, y + 4)
+    monitor.write(string.format("Burn: %.1f mB/t", reactor.burn_rate or 0))
+    
+    if y + 5 < y + boxHeight - 1 then
+        monitor.setCursorPos(x + 2, y + 5)
+        local fuelColor = reactor.fuel_percent < 20 and config.colors.warning or config.colors.text
+        monitor.setTextColor(fuelColor)
+        monitor.write(string.format("Fuel: %.1f%%", reactor.fuel_percent or 0))
     end
-    reactorWindow.write(string.format("%.0fK", temp))
     
-    -- Fuel and waste (row 3)
-    reactorWindow.setCursorPos(1, 3)
-    local fuelColor = reactor.fuel_percent < 20 and config.colors.warning or config.colors.text
-    reactorWindow.setTextColor(fuelColor)
-    reactorWindow.write(string.format("F%.0f%%", reactor.fuel_percent or 0))
+    if y + 6 < y + boxHeight - 1 then
+        monitor.setCursorPos(x + 2, y + 6)
+        local wasteColor = reactor.waste_percent > 3 and config.colors.warning or config.colors.text
+        monitor.setTextColor(wasteColor)
+        monitor.write(string.format("Waste: %.1f%%", reactor.waste_percent or 0))
+    end
     
-    -- Return button areas for click detection (adjusted for actual monitor position)
+    if y + 7 < y + boxHeight - 1 then
+        monitor.setCursorPos(x + 2, y + 7)
+        local coolantColor = reactor.coolant_percent < 97 and config.colors.warning or config.colors.text
+        monitor.setTextColor(coolantColor)
+        monitor.write(string.format("Cool: %.1f%%", reactor.coolant_percent or 0))
+    end
+    
+    -- Control button at bottom of box
+    local buttonY = y + boxHeight - 2
+    monitor.setCursorPos(x + 2, buttonY)
+    if reactor.active then
+        monitor.setBackgroundColor(config.colors.inactive)
+        monitor.setTextColor(config.colors.text)
+        monitor.write(" SCRAM ")
+    else
+        monitor.setBackgroundColor(config.colors.active)
+        monitor.setTextColor(config.colors.background)
+        monitor.write(" START ")
+    end
+    monitor.setBackgroundColor(config.colors.background)
+    
+    monitor.setTextColor(config.colors.text)
+    
     return {
         reactorId = reactorId,
-        toggleButton = {x = 1, y = 2, width = 4, height = 1},
+        toggleButton = {x = x + 2, y = buttonY, width = 7, height = 1},
         active = reactor.active,
         burnRate = reactor.burn_rate
     }
 end
 
 function ui.drawBatteryStatus(x, y, battery)
-    batteryWindow.setBackgroundColor(config.colors.background)
-    batteryWindow.clear()
+    local boxWidth = math.floor(width / 2) - 2
+    local boxHeight = math.floor((height - 3) / 2)
+    
+    ui.drawBox(x, y, boxWidth, boxHeight, "Battery")
     
     if not battery then
-        batteryWindow.setCursorPos(1, 1)
-        batteryWindow.setTextColor(config.colors.inactive)
-        batteryWindow.write("No Batt")
+        monitor.setCursorPos(x + 2, y + 2)
+        monitor.setTextColor(config.colors.inactive)
+        monitor.write("No data")
+        monitor.setTextColor(config.colors.text)
         return
     end
     
@@ -125,87 +160,96 @@ function ui.drawBatteryStatus(x, y, battery)
         percentColor = config.colors.warning
     end
     
-    batteryWindow.setCursorPos(1, 1)
-    batteryWindow.setTextColor(config.colors.header)
-    batteryWindow.write("B:")
-    batteryWindow.setTextColor(percentColor)
-    batteryWindow.write(string.format("%.0f%%", battery.percent_full))
+    monitor.setCursorPos(x + 2, y + 2)
+    monitor.setTextColor(percentColor)
+    monitor.write(string.format("Level: %.1f%%", battery.percent_full))
+    
+    monitor.setTextColor(config.colors.text)
+    monitor.setCursorPos(x + 2, y + 3)
+    local netFlow = battery.input_rate - battery.output_rate
+    local flowColor = netFlow > 0 and config.colors.good or config.colors.warning
+    monitor.setTextColor(flowColor)
+    monitor.write(string.format("Net: %+.0f RF/t", netFlow))
+    
+    if y + 4 < y + boxHeight - 1 then
+        monitor.setTextColor(config.colors.text)
+        monitor.setCursorPos(x + 2, y + 4)
+        monitor.write(string.format("In: %.0f RF/t", battery.input_rate))
+    end
+    
+    if y + 5 < y + boxHeight - 1 then
+        monitor.setCursorPos(x + 2, y + 5)
+        monitor.write(string.format("Out: %.0f RF/t", battery.output_rate))
+    end
 end
 
 function ui.drawAlerts(x, y, alerts)
-    alertWindow.setBackgroundColor(config.colors.background)
-    alertWindow.clear()
+    local boxWidth = width - x + 1
+    local boxHeight = height - y + 1
+    
+    ui.drawBox(x, y, boxWidth, boxHeight, "Alerts")
     
     if not alerts or #alerts == 0 then
-        alertWindow.setCursorPos(1, 1)
-        alertWindow.setTextColor(config.colors.good)
-        alertWindow.write("OK")
+        monitor.setCursorPos(x + 2, y + 2)
+        monitor.setTextColor(config.colors.good)
+        monitor.write("No active alerts")
+        monitor.setTextColor(config.colors.text)
         return
     end
     
-    -- Show last 2 alerts (2 rows available)
-    local startIdx = math.max(1, #alerts - 1)
-    local row = 1
+    local maxAlerts = boxHeight - 3
+    local displayCount = math.min(#alerts, maxAlerts)
     
-    for i = startIdx, #alerts do
-        local alert = alerts[i]
-        if alert and row <= 2 then
-            local alertColor = config.colors.warning
-            
-            if alert.level == "critical" or alert.level == "emergency" then
-                alertColor = config.colors.critical
-            elseif alert.level == "info" then
-                alertColor = config.colors.text
-            end
-            
-            alertWindow.setCursorPos(1, row)
-            alertWindow.setTextColor(alertColor)
-            
-            -- Truncate message to fit in 4 characters
-            local msg = string.sub(alert.message or "Alert", 1, 4)
-            alertWindow.write(msg)
-            
-            row = row + 1
+    for i = 1, displayCount do
+        local alert = alerts[#alerts - i + 1]
+        local alertColor = config.colors.warning
+        
+        if alert.level == "critical" or alert.level == "emergency" then
+            alertColor = config.colors.critical
+        elseif alert.level == "info" then
+            alertColor = config.colors.text
         end
+        
+        monitor.setCursorPos(x + 2, y + 1 + i)
+        monitor.setTextColor(alertColor)
+        
+        local message = string.sub(alert.message, 1, boxWidth - 4)
+        monitor.write(message)
     end
+    
+    monitor.setTextColor(config.colors.text)
 end
 
--- Simplified compact display for multiple reactors
-function ui.drawCompactDisplay(systemStatus, alerts)
-    ui.clear()
-    
-    -- Header
-    ui.drawHeader("REACTOR")
-    
-    -- Draw first reactor (or show "No Data" if none)
-    if systemStatus and systemStatus.reactors then
-        local reactorId, reactor = next(systemStatus.reactors)
-        if reactorId and reactor then
-            ui.drawReactorStatus(1, 2, reactorId, reactor)
-        else
-            reactorWindow.setCursorPos(1, 1)
-            reactorWindow.setTextColor(config.colors.inactive)
-            reactorWindow.write("No React")
-        end
-    else
-        reactorWindow.setCursorPos(1, 1)
-        reactorWindow.setTextColor(config.colors.inactive)
-        reactorWindow.write("Waiting..")
-    end
-    
-    -- Draw battery status
-    if systemStatus and systemStatus.battery then
-        ui.drawBatteryStatus(5, 2, systemStatus.battery)
-    end
-    
-    -- Draw alerts
-    ui.drawAlerts(5, 3, alerts)
-end
-
--- Control panel for 8x4 is too small, so we'll use a different approach
 function ui.drawControlPanel(x, y)
-    -- Return empty - controls will be handled by touch on reactor status
-    return {}
+    local boxWidth = math.min(30, width - x + 1)
+    local boxHeight = 6
+    
+    if y + boxHeight > height then
+        return {}
+    end
+    
+    ui.drawBox(x, y, boxWidth, boxHeight, "System Control")
+    
+    monitor.setCursorPos(x + 2, y + 2)
+    monitor.write("Emergency:")
+    
+    monitor.setCursorPos(x + 2, y + 3)
+    monitor.setBackgroundColor(config.colors.critical)
+    monitor.setTextColor(config.colors.text)
+    monitor.write(" SCRAM ALL ")
+    monitor.setBackgroundColor(config.colors.background)
+    
+    monitor.setCursorPos(x + 15, y + 3)
+    monitor.setBackgroundColor(config.colors.active)
+    monitor.setTextColor(config.colors.background)
+    monitor.write(" START ALL ")
+    monitor.setBackgroundColor(config.colors.background)
+    monitor.setTextColor(config.colors.text)
+    
+    return {
+        scramAllButton = {x = x + 2, y = y + 3, width = 11, height = 1},
+        startAllButton = {x = x + 15, y = y + 3, width = 11, height = 1}
+    }
 end
 
 function ui.formatTime(epoch)
@@ -225,9 +269,48 @@ function ui.isButtonClicked(button, clickX, clickY)
            clickY >= button.y and clickY < button.y + button.height
 end
 
--- Disable graph drawing for 8x4 monitor
 function ui.drawGraph(x, y, w, h, data, title, unit)
-    -- Too small for graphs
+    if #data < 2 or h < 5 or w < 10 then
+        return
+    end
+    
+    ui.drawBox(x, y, w, h, title)
+    
+    local graphWidth = w - 4
+    local graphHeight = h - 4
+    local dataPoints = math.min(#data, graphWidth)
+    
+    local maxVal = 0
+    local minVal = math.huge
+    for i = #data - dataPoints + 1, #data do
+        if data[i] then
+            maxVal = math.max(maxVal, data[i])
+            minVal = math.min(minVal, data[i])
+        end
+    end
+    
+    if maxVal == minVal then
+        maxVal = minVal + 1
+    end
+    
+    for i = 0, dataPoints - 1 do
+        local dataIdx = #data - dataPoints + i + 1
+        if data[dataIdx] then
+            local val = data[dataIdx]
+            local height = math.floor((val - minVal) / (maxVal - minVal) * graphHeight)
+            
+            for j = 0, height do
+                monitor.setCursorPos(x + 2 + i, y + h - 3 - j)
+                monitor.write("#")
+            end
+        end
+    end
+    
+    monitor.setCursorPos(x + 2, y + 1)
+    monitor.write(string.format("%.1f%s", maxVal, unit or ""))
+    
+    monitor.setCursorPos(x + 2, y + h - 2)
+    monitor.write(string.format("%.1f%s", minVal, unit or ""))
 end
 
 return ui
