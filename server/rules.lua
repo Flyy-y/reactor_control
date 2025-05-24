@@ -116,36 +116,9 @@ function rules.getReactorDecision(reactorId, config)
 end
 
 function rules.calculateOptimalBurnRate(reactorId, config)
-    local reactor = reactorStates[reactorId]
-    if not reactor then
-        return config.auto_control.min_burn_rate
-    end
-    
-    local currentRate = reactor.burn_rate
-    local targetRate = currentRate
-    
-    if reactor.temperature > config.alerts.temperature_warning then
-        targetRate = math.max(
-            config.auto_control.min_burn_rate,
-            currentRate - config.auto_control.ramp_down_rate
-        )
-    elseif batteryState and batteryState.percent_full < 50 then
-        targetRate = math.min(
-            config.auto_control.max_burn_rate,
-            currentRate + config.auto_control.ramp_up_rate
-        )
-    elseif reactor.temperature < 800 and batteryState and batteryState.percent_full < 70 then
-        targetRate = math.min(
-            config.auto_control.target_burn_rate,
-            currentRate + config.auto_control.ramp_up_rate
-        )
-    end
-    
-    targetRate = math.max(config.auto_control.min_burn_rate, targetRate)
-    targetRate = math.min(config.auto_control.max_burn_rate, targetRate)
-    targetRate = math.min(reactor.max_burn_rate, targetRate)
-    
-    return targetRate
+    -- This function is deprecated - burn rate optimization is now handled
+    -- by optimizeBurnRates() in server/main.lua using percentage-based control
+    return nil
 end
 
 function rules.getSystemStatus()

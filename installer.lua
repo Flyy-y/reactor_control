@@ -210,11 +210,11 @@ local function installComponent(component, privateKey)
             },
             auto_control = {
                 enabled = true,
-                target_burn_rate = 10,
-                min_burn_rate = 1,
-                max_burn_rate = 50,
-                ramp_up_rate = 1,
-                ramp_down_rate = 5
+                min_burn_percent = 0.1,  -- 0.1% of max burn rate when battery > 80%
+                max_burn_percent = 80,   -- 80% of max burn rate when battery < 10%
+                battery_high = 80,       -- Battery % to start reducing burn rate
+                battery_low = 10,        -- Battery % to start increasing burn rate
+                ramp_rate = 0.5          -- mB/t change per update cycle
             },
             alerts = {
                 temperature_warning = 1000,

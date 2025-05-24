@@ -7,9 +7,9 @@ return {
     heartbeat_interval = 15,
     
     emergency_shutdown = {
-        temperature = 1400,
-        damage = 25,
-        waste_percent = 10
+        temperature = 1200,
+        damage = 5,
+        waste_percent = 5
     },
     
     display = {

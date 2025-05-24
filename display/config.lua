@@ -8,7 +8,7 @@ return {
     
     monitor = {
         side = "auto",
-        text_scale = 0.5
+        text_scale = 0.9
     },
     
     display = {
