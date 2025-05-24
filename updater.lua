@@ -44,76 +44,14 @@ local function downloadFile(url, destination)
     end
 end
 
-local function getLocalFileHash(path)
-    if not fs.exists(path) then
-        return nil
-    end
-    
-    local file = fs.open(path, "r")
-    local content = file.readAll()
-    file.close()
-    
-    -- Simple hash based on file size and first/last 100 chars
-    local hash = tostring(#content)
-    if #content > 200 then
-        hash = hash .. string.sub(content, 1, 100) .. string.sub(content, -100)
-    else
-        hash = hash .. content
-    end
-    
-    return hash
-end
-
-local function needsUpdate(file)
-    local localPath = "/reactor_control/" .. file
-    local url = getGithubUrl(file)
-    
-    -- Get remote file
-    local response = http.get(url)
-    if not response then
-        print("  Cannot check: " .. file)
-        return false
-    end
-    
-    local remoteContent = response.readAll()
-    response.close()
-    
-    -- Compare with local
-    if not fs.exists(localPath) then
-        return true -- File doesn't exist locally
-    end
-    
-    local localFile = fs.open(localPath, "r")
-    local localContent = localFile.readAll()
-    localFile.close()
-    
-    return localContent ~= remoteContent
-end
 
 function updater.checkAndUpdate()
-    print("Checking for updates...")
-    
-    local filesToUpdate = {}
-    local hasUpdates = false
-    
-    -- Check each file
-    for _, file in ipairs(config.files) do
-        if needsUpdate(file) then
-            table.insert(filesToUpdate, file)
-            hasUpdates = true
-        end
-    end
-    
-    if not hasUpdates then
-        print("No updates available.")
-        return false
-    end
-    
-    print("Updates available for " .. #filesToUpdate .. " file(s)")
-    print("Downloading updates...")
+    print("Downloading latest versions of all files...")
     
     local allSuccess = true
-    for _, file in ipairs(filesToUpdate) do
+    
+    -- Always download all files (no hash checking)
+    for _, file in ipairs(config.files) do
         local url = getGithubUrl(file)
         local destination = "/reactor_control/" .. file
         
@@ -123,7 +61,7 @@ function updater.checkAndUpdate()
     end
     
     if allSuccess then
-        print("All updates downloaded successfully!")
+        print("All files updated successfully!")
         print("Restarting in 3 seconds...")
         sleep(3)
         os.reboot()
@@ -136,25 +74,8 @@ function updater.checkAndUpdate()
 end
 
 function updater.forceUpdate()
-    print("Force updating all files...")
-    
-    local allSuccess = true
-    for _, file in ipairs(config.files) do
-        local url = getGithubUrl(file)
-        local destination = "/reactor_control/" .. file
-        
-        if not downloadFile(url, destination) then
-            allSuccess = false
-        end
-    end
-    
-    if allSuccess then
-        print("All files updated successfully!")
-    else
-        print("Some updates failed.")
-    end
-    
-    return allSuccess
+    -- forceUpdate now does the same as checkAndUpdate (always download everything)
+    return updater.checkAndUpdate()
 end
 
 return updater
