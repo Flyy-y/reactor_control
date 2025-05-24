@@ -14,8 +14,10 @@ function updater.setConfig(newConfig)
 end
 
 local function getGithubUrl(file)
-    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s",
-        config.github_user, config.github_repo, config.branch, file)
+    -- Add cache-busting parameter
+    local cacheBuster = "?v=" .. tostring(math.random(100000, 999999))
+    return string.format("https://raw.githubusercontent.com/%s/%s/%s/%s%s",
+        config.github_user, config.github_repo, config.branch, file, cacheBuster)
 end
 
 local function downloadFile(url, destination)

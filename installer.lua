@@ -47,7 +47,9 @@ end
 
 local function getGithubUrl(file)
     local baseUrl = "https://raw.githubusercontent.com/Flyy-y/reactor_control/main/"
-    return baseUrl .. file
+    -- Add cache-busting parameter
+    local cacheBuster = "?v=" .. tostring(math.random(100000, 999999))
+    return baseUrl .. file .. cacheBuster
 end
 
 local function promptChoice(prompt, choices)
