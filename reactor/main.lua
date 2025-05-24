@@ -96,70 +96,122 @@ end
 
 local function getFuelCapacity()
     if not reactor then return 0 end
-    return reactor.getFuelCapacity()
+    if reactor.getFuelCapacity then
+        return reactor.getFuelCapacity()
+    end
+    return 0
 end
 
 local function getFuelAmount()
     if not reactor then return 0 end
-    return reactor.getFuelAmount()
+    if reactor.getFuel then
+        local fuel = reactor.getFuel()
+        if fuel and fuel.amount then
+            return fuel.amount
+        end
+    end
+    return 0
 end
 
 local function getFuelPercent()
     if not reactor then return 0 end
-    local capacity = getFuelCapacity()
-    if capacity == 0 then return 0 end
-    return (getFuelAmount() / capacity) * 100
+    if reactor.getFuelFilledPercentage then
+        return reactor.getFuelFilledPercentage()
+    else
+        local capacity = getFuelCapacity()
+        if capacity == 0 then return 0 end
+        return (getFuelAmount() / capacity) * 100
+    end
 end
 
 local function getWasteCapacity()
     if not reactor then return 0 end
-    return reactor.getWasteCapacity()
+    if reactor.getWasteCapacity then
+        return reactor.getWasteCapacity()
+    end
+    return 0
 end
 
 local function getWasteAmount()
     if not reactor then return 0 end
-    return reactor.getWasteAmount()
+    if reactor.getWaste then
+        local waste = reactor.getWaste()
+        if waste and waste.amount then
+            return waste.amount
+        end
+    end
+    return 0
 end
 
 local function getWastePercent()
     if not reactor then return 0 end
-    local capacity = getWasteCapacity()
-    if capacity == 0 then return 0 end
-    return (getWasteAmount() / capacity) * 100
+    if reactor.getWasteFilledPercentage then
+        return reactor.getWasteFilledPercentage()
+    else
+        local capacity = getWasteCapacity()
+        if capacity == 0 then return 0 end
+        return (getWasteAmount() / capacity) * 100
+    end
 end
 
 local function getCoolantCapacity()
     if not reactor then return 0 end
-    return reactor.getCoolantCapacity()
+    if reactor.getCoolantCapacity then
+        return reactor.getCoolantCapacity()
+    end
+    return 0
 end
 
 local function getCoolantAmount()
     if not reactor then return 0 end
-    return reactor.getCoolantAmount()
+    if reactor.getCoolant then
+        local coolant = reactor.getCoolant()
+        if coolant and coolant.amount then
+            return coolant.amount
+        end
+    end
+    return 0
 end
 
 local function getCoolantPercent()
     if not reactor then return 0 end
-    local capacity = getCoolantCapacity()
-    if capacity == 0 then return 0 end
-    return (getCoolantAmount() / capacity) * 100
+    if reactor.getCoolantFilledPercentage then
+        return reactor.getCoolantFilledPercentage()
+    else
+        local capacity = getCoolantCapacity()
+        if capacity == 0 then return 0 end
+        return (getCoolantAmount() / capacity) * 100
+    end
 end
 
 local function getHeatedCoolantCapacity()
     if not reactor then return 0 end
-    return reactor.getHeatedCoolantCapacity()
+    if reactor.getHeatedCoolantCapacity then
+        return reactor.getHeatedCoolantCapacity()
+    end
+    return 0
 end
 
 local function getHeatedCoolantAmount()
     if not reactor then return 0 end
-    return reactor.getHeatedCoolantAmount()
+    if reactor.getHeatedCoolant then
+        local heatedCoolant = reactor.getHeatedCoolant()
+        if heatedCoolant and heatedCoolant.amount then
+            return heatedCoolant.amount
+        end
+    end
+    return 0
 end
 
 local function getHeatedCoolantPercent()
     if not reactor then return 0 end
-    local capacity = getHeatedCoolantCapacity()
-    if capacity == 0 then return 0 end
-    return (getHeatedCoolantAmount() / capacity) * 100
+    if reactor.getHeatedCoolantFilledPercentage then
+        return reactor.getHeatedCoolantFilledPercentage()
+    else
+        local capacity = getHeatedCoolantCapacity()
+        if capacity == 0 then return 0 end
+        return (getHeatedCoolantAmount() / capacity) * 100
+    end
 end
 
 local function getStats()
