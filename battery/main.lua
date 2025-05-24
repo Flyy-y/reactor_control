@@ -1,6 +1,6 @@
-os.loadAPI("/reactor_control/shared/network.lua")
-os.loadAPI("/reactor_control/shared/protocol.lua")
-os.loadAPI("/reactor_control/battery/battery_api.lua")
+local network = dofile("/reactor_control/shared/network.lua")
+local protocol = dofile("/reactor_control/shared/protocol.lua")
+local battery_api = dofile("/reactor_control/battery/battery_api.lua")
 
 local config = dofile("/reactor_control/battery/config.lua")
 
