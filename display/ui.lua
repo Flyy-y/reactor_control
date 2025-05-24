@@ -213,8 +213,8 @@ function ui.drawBatteryStatus(x, y, battery)
     local statusColor = config.colors.inactive
     local currentTime = os.epoch("utc")
     
-    if battery and battery.last_update then
-        local timeSinceUpdate = (currentTime - battery.last_update) / 1000  -- Convert to seconds
+    if battery and battery.lastUpdate then
+        local timeSinceUpdate = (currentTime - battery.lastUpdate) / 1000  -- Convert to seconds
         if timeSinceUpdate <= 10 then
             statusColor = config.colors.good  -- Green for fresh data
         else
