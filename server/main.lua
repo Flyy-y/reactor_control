@@ -9,6 +9,7 @@ local config = dofile("/reactor_control/server/config.lua")
 local lastSaveTime = os.epoch("utc")
 local componentStatus = {}
 local manualScramReactors = {}  -- Track manually scrammed reactors
+local batteryTimeoutScram = false  -- Track if we've already scrammed due to battery timeout
 
 local function init()
     term.clear()
@@ -65,6 +66,25 @@ local function handleBatteryStatus(message, channel)
     storage.addBatteryData(data)
     
     componentStatus["battery"] = os.epoch("utc")
+    
+    -- Reset battery timeout flag when battery comes back online
+    if batteryTimeoutScram then
+        batteryTimeoutScram = false
+        storage.log("Battery controller back online - emergency SCRAM flag reset")
+        
+        -- Send recovery alert
+        local alert = network.createMessage(
+            protocol.messageTypes.BROADCAST,
+            protocol.commands.ALERT,
+            protocol.createAlert(
+                protocol.alertLevels.WARNING,
+                "server",
+                "Battery controller reconnected - Manual reactor restart required",
+                {battery_percent = data.percent_full}
+            )
+        )
+        network.broadcast(alert)
+    end
 end
 
 local function handleDisplayRequest(message, channel)
@@ -240,6 +260,49 @@ local function periodicTasks()
     
     if not health.battery then
         storage.log("WARNING: Battery controller not responding")
+        
+        -- Check how long battery has been offline
+        local batteryStatus = rules.getSystemStatus().battery
+        if batteryStatus and batteryStatus.lastUpdate then
+            local timeSinceUpdate = (os.epoch("utc") - batteryStatus.lastUpdate) / 1000
+            
+            if timeSinceUpdate > 30 and not batteryTimeoutScram then
+                -- Battery offline for more than 30 seconds - SCRAM all reactors (only once)
+                storage.log("EMERGENCY: Battery offline for " .. math.floor(timeSinceUpdate) .. " seconds - SCRAMing all reactors!")
+                batteryTimeoutScram = true
+                
+                -- Send alert
+                local alert = network.createMessage(
+                    protocol.messageTypes.BROADCAST,
+                    protocol.commands.ALERT,
+                    protocol.createAlert(
+                        protocol.alertLevels.EMERGENCY,
+                        "server",
+                        "BATTERY OFFLINE >30s - All reactors SCRAMed for safety",
+                        {timeout_seconds = timeSinceUpdate}
+                    )
+                )
+                network.broadcast(alert)
+                
+                -- SCRAM all reactors
+                for reactorId, reactor in pairs(rules.getSystemStatus().reactors or {}) do
+                    local scramMsg = network.createMessage(
+                        protocol.messageTypes.REQUEST,
+                        protocol.commands.REACTOR_CONTROL,
+                        {
+                            reactor_id = reactorId,
+                            action = "scram"
+                        }
+                    )
+                    
+                    local reactorChannel = config.reactor_channels[reactorId]
+                    if reactorChannel then
+                        network.send(reactorChannel, scramMsg)
+                        storage.log("Emergency SCRAM sent to reactor " .. reactorId)
+                    end
+                end
+            end
+        end
     end
     
     local now = os.epoch("utc")
