@@ -135,16 +135,6 @@ local function promptText(prompt, allowEmpty)
     return input
 end
 
-local function promptPassword(prompt)
-    print(prompt)
-    write("> ")
-    local input = read("*")
-    if input == "" then
-        print("Password cannot be empty!")
-        return promptPassword(prompt)
-    end
-    return input
-end
 
 local function promptNumber(prompt, min, max)
     print(prompt)
@@ -158,7 +148,7 @@ local function promptNumber(prompt, min, max)
     end
 end
 
-local function discoverReactors(privateKey)
+local function discoverReactors()
     print("\nScanning for existing reactors...")
     
     local modem = peripheral.find("modem")
@@ -172,7 +162,6 @@ local function discoverReactors(privateKey)
     local message = {
         type = "request",
         command = "discover_reactors",
-        privateKey = privateKey,
         sender = os.getComputerID(),
         timestamp = os.epoch("utc")
     }
@@ -191,7 +180,7 @@ local function discoverReactors(privateKey)
             break
         elseif event == "modem_message" then
             local msg = p4
-            if type(msg) == "table" and msg.command == "reactor_info" and msg.privateKey == privateKey then
+            if type(msg) == "table" and msg.command == "reactor_info" then
                 table.insert(reactors, msg.reactor_id)
                 print("Found reactor: ID " .. msg.reactor_id)
             end
@@ -218,7 +207,7 @@ local function getNextReactorId(existingReactors)
     return existingReactors[#existingReactors] + 1
 end
 
-local function installComponent(component, privateKey)
+local function installComponent(component)
     printHeader()
     print("Installing: " .. component)
     print()
@@ -236,7 +225,6 @@ local function installComponent(component, privateKey)
         }
         
         config = {
-            privateKey = privateKey,
             modem_channel = 100,
             reactor_channels = {101, 102, 103, 104},
             battery_channel = 110,
@@ -279,7 +267,7 @@ local function installComponent(component, privateKey)
         }
         
     elseif component == "Reactor Controller" then
-        local existingReactors = discoverReactors(privateKey)
+        local existingReactors = discoverReactors()
         local reactorId = nil
         
         if #existingReactors > 0 then
@@ -300,7 +288,6 @@ local function installComponent(component, privateKey)
         }
         
         config = {
-            privateKey = privateKey,
             reactor_id = reactorId,
             server_channel = 100,
             broadcast_channel = 100 + reactorId,
@@ -326,7 +313,6 @@ local function installComponent(component, privateKey)
         }
         
         config = {
-            privateKey = privateKey,
             server_channel = 100,
             broadcast_channel = 110,
             update_interval = 3,
@@ -354,7 +340,6 @@ local function installComponent(component, privateKey)
         }
         
         config = {
-            privateKey = privateKey,
             display_id = displayId,
             server_channel = 100,
             listen_channel = 119 + displayId,
@@ -448,20 +433,13 @@ local function installComponent(component, privateKey)
     -- If no existing config, create minimal one with user values
     if not existingLocalConfig then
         existingLocalConfig = {}
-        if component == "Server" then
-            existingLocalConfig.privateKey = privateKey
-        elseif component == "Reactor Controller" then
-            existingLocalConfig.privateKey = privateKey
+        if component == "Reactor Controller" then
             existingLocalConfig.reactor_id = config.reactor_id
-        elseif component == "Battery Controller" then
-            existingLocalConfig.privateKey = privateKey
         elseif component == "Display" then
-            existingLocalConfig.privateKey = privateKey
             existingLocalConfig.display_id = config.display_id
         end
     else
         -- Update critical fields in existing config
-        existingLocalConfig.privateKey = privateKey
         if component == "Reactor Controller" then
             existingLocalConfig.reactor_id = config.reactor_id
         elseif component == "Display" then
@@ -524,32 +502,6 @@ local function main()
         end
     end
     
-    -- Get or generate private key
-    local privateKey = ""
-    local existingConfig = readConfig("/reactor_control/config.lua")
-    
-    if existingConfig and existingConfig.privateKey then
-        print("Found existing private key.")
-        if promptYesNo("Use existing private key?") then
-            privateKey = existingConfig.privateKey
-        else
-            privateKey = promptPassword("Enter private key (shared secret for all components)")
-        end
-    else
-        if promptYesNo("Generate random private key?") then
-            privateKey = tostring(math.random(100000, 999999))
-            print("Generated private key: " .. privateKey)
-            print("IMPORTANT: Write this down! You'll need it for other components.")
-            print()
-            print("Press any key to continue...")
-            os.pullEvent("key")
-        else
-            privateKey = promptPassword("Enter private key (shared secret for all components)")
-        end
-    end
-    
-    -- Save private key
-    writeConfig("/reactor_control/config.lua", {privateKey = privateKey})
     
     -- Choose component
     local components = {
@@ -562,12 +514,11 @@ local function main()
     printHeader()
     local choice = promptChoice("Select component to install:", components)
     
-    if installComponent(components[choice], privateKey) then
+    if installComponent(components[choice]) then
         printHeader()
         print("Installation complete!")
         print()
         print("Component: " .. components[choice])
-        print("Private key: " .. string.rep("*", #privateKey))
         print()
         
         -- Always start the component

@@ -5,9 +5,7 @@ local channels = {}
 local messageHandlers = {}
 local responseHandlers = {}
 local messageId = 0
-network.privateKey = nil
-
-function network.init(modemSide, listenChannels, privateKey)
+function network.init(modemSide, listenChannels)
     modem = peripheral.find("modem") or peripheral.wrap(modemSide)
     if not modem then
         error("No modem found on side: " .. tostring(modemSide))
@@ -18,7 +16,6 @@ function network.init(modemSide, listenChannels, privateKey)
     end
     
     channels = listenChannels or {}
-    network.privateKey = privateKey
     
     for _, channel in ipairs(channels) do
         modem.open(channel)
@@ -41,8 +38,7 @@ function network.createMessage(msgType, command, data, target)
         target = target or "all",
         command = command,
         data = data or {},
-        timestamp = os.epoch("utc"),
-        privateKey = network.privateKey
+        timestamp = os.epoch("utc")
     }
 end
 
@@ -105,11 +101,6 @@ end
 function network.handleModemMessage(side, senderChannel, replyChannel, message, distance)
     if type(message) ~= "table" then
         return
-    end
-    
-    -- Check authentication
-    if network.privateKey and message.privateKey ~= network.privateKey then
-        return -- Ignore messages with wrong private key
     end
     
     if message.target ~= "all" and message.target ~= os.getComputerID() then

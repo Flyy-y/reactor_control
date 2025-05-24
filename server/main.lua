@@ -25,7 +25,7 @@ local function init()
         table.insert(channels, ch)
     end
     
-    network.init(nil, channels, config.privateKey)
+    network.init(nil, channels)
     storage.init(config)
     
     storage.log("Server started")

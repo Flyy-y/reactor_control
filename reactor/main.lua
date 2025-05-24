@@ -242,7 +242,7 @@ local function init()
         error("Failed to initialize reactor")
     end
     
-    network.init(nil, {config.server_channel, config.broadcast_channel}, config.privateKey)
+    network.init(nil, {config.server_channel, config.broadcast_channel})
     
     print("Controller ready")
     print("Press Q to shutdown")

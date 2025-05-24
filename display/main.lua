@@ -21,7 +21,7 @@ local function init()
     print("Initializing...")
     
     ui.init(config)
-    network.init(nil, {config.server_channel, config.listen_channel}, config.privateKey)
+    network.init(nil, {config.server_channel, config.listen_channel})
     
     print("Display ready")
     print("Press Q to shutdown")

@@ -1,5 +1,4 @@
 return {
-    privateKey = "YOUR_PRIVATE_KEY_HERE",
     server_channel = 100,
     broadcast_channel = 110,
     
