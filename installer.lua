@@ -341,6 +341,14 @@ local function installComponent(component, privateKey)
     
     -- Download files
     print("\nDownloading files...")
+    
+    -- Always download updater.lua first
+    if not downloadFile(getGithubUrl("updater.lua"), "/reactor_control/updater.lua") then
+        print("Warning: Failed to download updater.lua")
+        print("Updates will not be available")
+    end
+    
+    -- Download component-specific files
     for _, file in ipairs(files) do
         local url = getGithubUrl(file)
         local destination = "/reactor_control/" .. file
