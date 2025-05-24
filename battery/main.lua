@@ -93,11 +93,13 @@ local function sendBatteryStatus()
     
     local sendSuccess, sendError = pcall(network.send, config.server_channel, message)
     if sendSuccess then
-        print(string.format("Sent battery status: %.1f%%", stats.energyPercent))
+        local time = os.date("%H:%M:%S")
+        print(string.format("[%s] Sent battery status: %.1f%%", time, stats.energyPercent))
         lastSuccessfulSend = os.epoch("utc")
         failureCount = 0
     else
-        print("Error sending battery status: " .. tostring(sendError))
+        local time = os.date("%H:%M:%S")
+        print(string.format("[%s] Error sending battery status: %s", time, tostring(sendError)))
         failureCount = failureCount + 1
         
         -- If we've failed too many times, try to reinitialize
@@ -188,8 +190,12 @@ local function displayStatus()
 end
 
 local function handlePing(message, channel)
-    -- Just acknowledge the ping - battery doesn't need timeout protection like reactors
-    print("Received server ping")
+    -- Acknowledge the ping and send battery status
+    local time = os.date("%H:%M:%S")
+    print(string.format("[%s] Received server ping", time))
+    
+    -- Send battery status in response to ping
+    sendBatteryStatus()
 end
 
 local function main()
@@ -233,8 +239,9 @@ local function main()
                 -- Check if we haven't sent status in too long
                 local timeSinceLastSend = (os.epoch("utc") - lastSuccessfulSend) / 1000
                 if timeSinceLastSend > 60 then  -- 60 seconds without successful send
-                    print("WATCHDOG: No successful status sent in " .. math.floor(timeSinceLastSend) .. " seconds")
-                    print("Attempting recovery...")
+                    local time = os.date("%H:%M:%S")
+                    print(string.format("[%s] WATCHDOG: No successful status sent in %d seconds", time, math.floor(timeSinceLastSend)))
+                    print(string.format("[%s] Attempting recovery...", time))
                     
                     -- Try to reinitialize everything
                     local initSuccess, initError = pcall(battery_api.initialize)
