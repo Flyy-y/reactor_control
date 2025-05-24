@@ -50,6 +50,7 @@ end
 
 local function scram()
     if not reactor then return false end
+    if not isActive() then return true end  -- Already scrammed
     reactor.scram()
     return true
 end
