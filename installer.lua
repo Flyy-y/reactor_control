@@ -399,12 +399,12 @@ shell.run("/reactor_control/display/main.lua")
 ]]
     end
     
-    if promptYesNo("\nCreate startup file for automatic launch?") then
-        local file = fs.open("/startup.lua", "w")
-        file.write(startupContent)
-        file.close()
-        print("Startup file created.")
-    end
+    -- Always create startup file
+    print("\nCreating startup file...")
+    local file = fs.open("/startup.lua", "w")
+    file.write(startupContent)
+    file.close()
+    print("Startup file created.")
     
     return true
 end
@@ -474,11 +474,9 @@ local function main()
         print("Private key: " .. string.rep("*", #privateKey))
         print()
         
-        if promptYesNo("Start the component now?") then
-            shell.run("/startup.lua")
-        else
-            print("\nTo start manually, run: /startup.lua")
-        end
+        -- Always start the component
+        print("Starting the component...")
+        shell.run("/startup.lua")
     else
         print("\nInstallation failed!")
     end
