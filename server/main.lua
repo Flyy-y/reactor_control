@@ -8,6 +8,7 @@ local config = dofile("/reactor_control/server/config.lua")
 
 local lastSaveTime = os.epoch("utc")
 local componentStatus = {}
+local manualScramReactors = {}  -- Track manually scrammed reactors
 
 local function init()
     term.clear()
@@ -119,6 +120,7 @@ end
 
 local function periodicTasks()
     checkAndSendAlerts()
+    optimizeBurnRates()  -- Add burn rate optimization
     
     local health = rules.checkComponentHealth(config)
     for component, isHealthy in pairs(health.reactors) do
@@ -177,12 +179,94 @@ local function handleDiscoverReactors(message, channel)
     network.respond(message, {reactors = reactorList}, "ok")
 end
 
+local function handleReactorControl(message, channel)
+    -- Track manual scrams
+    if message.data.action == "scram" then
+        manualScramReactors[message.data.reactor_id] = true
+        storage.log("Manual SCRAM for reactor " .. message.data.reactor_id)
+    elseif message.data.action == "activate" then
+        manualScramReactors[message.data.reactor_id] = nil
+        storage.log("Manual activation for reactor " .. message.data.reactor_id)
+    end
+    
+    -- Forward control message to appropriate reactor
+    local reactorChannel = config.reactor_channels[message.data.reactor_id]
+    if reactorChannel then
+        network.send(reactorChannel, message)
+        storage.log("Forwarded control to reactor " .. message.data.reactor_id)
+    end
+end
+
+local function optimizeBurnRates()
+    if not config.auto_control.enabled then return end
+    
+    local status = rules.getSystemStatus()
+    if not status.battery then return end
+    
+    local batteryPercent = status.battery.percent_full
+    
+    for reactorId, reactor in pairs(status.reactors or {}) do
+        -- Skip manually scrammed reactors
+        if not manualScramReactors[reactorId] and reactor.active then
+            local maxBurn = reactor.max_burn_rate or 100
+            local currentBurn = reactor.burn_rate or 0
+            local targetBurn = currentBurn
+            
+            -- Calculate target burn rate based on battery level
+            if batteryPercent >= config.auto_control.battery_high then
+                -- Battery high, reduce to minimum
+                targetBurn = maxBurn * (config.auto_control.min_burn_percent / 100)
+            elseif batteryPercent <= config.auto_control.battery_low then
+                -- Battery low, increase to maximum
+                targetBurn = maxBurn * (config.auto_control.max_burn_percent / 100)
+            else
+                -- Linear interpolation between min and max
+                local range = config.auto_control.battery_high - config.auto_control.battery_low
+                local batteryRange = batteryPercent - config.auto_control.battery_low
+                local burnRange = config.auto_control.max_burn_percent - config.auto_control.min_burn_percent
+                local burnPercent = config.auto_control.max_burn_percent - (batteryRange / range * burnRange)
+                targetBurn = maxBurn * (burnPercent / 100)
+            end
+            
+            -- Apply ramping
+            if math.abs(targetBurn - currentBurn) > config.auto_control.ramp_rate then
+                if targetBurn > currentBurn then
+                    targetBurn = currentBurn + config.auto_control.ramp_rate
+                else
+                    targetBurn = currentBurn - config.auto_control.ramp_rate
+                end
+            end
+            
+            -- Send burn rate adjustment if needed
+            if math.abs(targetBurn - currentBurn) > 0.1 then
+                local controlMsg = network.createMessage(
+                    protocol.messageTypes.REQUEST,
+                    protocol.commands.REACTOR_CONTROL,
+                    {
+                        reactor_id = reactorId,
+                        action = "set_burn_rate",
+                        value = targetBurn
+                    }
+                )
+                
+                local reactorChannel = config.reactor_channels[reactorId]
+                if reactorChannel then
+                    network.send(reactorChannel, controlMsg)
+                    storage.log(string.format("Auto-adjust reactor %d burn rate: %.1f -> %.1f mB/t (Battery: %.1f%%)", 
+                        reactorId, currentBurn, targetBurn, batteryPercent))
+                end
+            end
+        end
+    end
+end
+
 local function setupHandlers()
     network.on(protocol.commands.REACTOR_STATUS, handleReactorStatus)
     network.on(protocol.commands.BATTERY_STATUS, handleBatteryStatus)
     network.on(protocol.commands.DISPLAY_REQUEST, handleDisplayRequest)
     network.on(protocol.commands.HEARTBEAT, handleHeartbeat)
     network.on(protocol.commands.DISCOVER_REACTORS, handleDiscoverReactors)
+    network.on(protocol.commands.REACTOR_CONTROL, handleReactorControl)
 end
 
 local function main()

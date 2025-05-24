@@ -4,6 +4,22 @@ local monitor = nil
 local width, height = 0, 0
 local config = nil
 
+-- Helper function to format RF values
+local function formatRF(value)
+    local absValue = math.abs(value)
+    local sign = value < 0 and "-" or value > 0 and "+" or ""
+    
+    if absValue >= 1e9 then
+        return string.format("%s%.1fG", sign, absValue / 1e9)
+    elseif absValue >= 1e6 then
+        return string.format("%s%.1fM", sign, absValue / 1e6)
+    elseif absValue >= 1e3 then
+        return string.format("%s%.1fK", sign, absValue / 1e3)
+    else
+        return string.format("%s%.0f", sign, absValue)
+    end
+end
+
 function ui.init(displayConfig)
     config = displayConfig
     
@@ -87,30 +103,33 @@ function ui.drawReactorStatus(x, y, reactorId, reactor)
     
     monitor.setTextColor(config.colors.text)
     monitor.setCursorPos(x + 2, y + 3)
-    monitor.write(string.format("Temp: %.0fK", reactor.temperature or 0))
+    local tempColor = reactor.temperature > 1000 and config.colors.warning or config.colors.text
+    monitor.setTextColor(tempColor)
+    monitor.write(string.format("Temp:    %4.0fK", reactor.temperature or 0))
     
+    monitor.setTextColor(config.colors.text)
     monitor.setCursorPos(x + 2, y + 4)
-    monitor.write(string.format("Burn: %.1f mB/t", reactor.burn_rate or 0))
+    monitor.write(string.format("Burn:    %4.1f mB/t", reactor.burn_rate or 0))
     
     if y + 5 < y + boxHeight - 1 then
         monitor.setCursorPos(x + 2, y + 5)
         local fuelColor = reactor.fuel_percent < 20 and config.colors.warning or config.colors.text
         monitor.setTextColor(fuelColor)
-        monitor.write(string.format("Fuel: %.1f%%", reactor.fuel_percent or 0))
+        monitor.write(string.format("Fuel:    %4.1f%%", reactor.fuel_percent or 0))
     end
     
     if y + 6 < y + boxHeight - 1 then
         monitor.setCursorPos(x + 2, y + 6)
         local wasteColor = reactor.waste_percent > 3 and config.colors.warning or config.colors.text
         monitor.setTextColor(wasteColor)
-        monitor.write(string.format("Waste: %.1f%%", reactor.waste_percent or 0))
+        monitor.write(string.format("Waste:   %4.1f%%", reactor.waste_percent or 0))
     end
     
     if y + 7 < y + boxHeight - 1 then
         monitor.setCursorPos(x + 2, y + 7)
         local coolantColor = reactor.coolant_percent < 97 and config.colors.warning or config.colors.text
         monitor.setTextColor(coolantColor)
-        monitor.write(string.format("Cool: %.1f%%", reactor.coolant_percent or 0))
+        monitor.write(string.format("Coolant: %4.1f%%", reactor.coolant_percent or 0))
     end
     
     -- Control button at bottom of box
@@ -169,17 +188,17 @@ function ui.drawBatteryStatus(x, y, battery)
     local netFlow = battery.input_rate - battery.output_rate
     local flowColor = netFlow > 0 and config.colors.good or config.colors.warning
     monitor.setTextColor(flowColor)
-    monitor.write(string.format("Net: %+.0f RF/t", netFlow))
+    monitor.write(string.format("Net: %s RF/t", formatRF(netFlow)))
     
     if y + 4 < y + boxHeight - 1 then
         monitor.setTextColor(config.colors.text)
         monitor.setCursorPos(x + 2, y + 4)
-        monitor.write(string.format("In: %.0f RF/t", battery.input_rate))
+        monitor.write(string.format("In:  %s RF/t", formatRF(battery.input_rate)))
     end
     
     if y + 5 < y + boxHeight - 1 then
         monitor.setCursorPos(x + 2, y + 5)
-        monitor.write(string.format("Out: %.0f RF/t", battery.output_rate))
+        monitor.write(string.format("Out: %s RF/t", formatRF(battery.output_rate)))
     end
 end
 
