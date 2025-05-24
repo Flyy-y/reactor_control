@@ -265,6 +265,9 @@ function ui.getSize()
 end
 
 function ui.isButtonClicked(button, clickX, clickY)
+    if not button or not button.x or not button.y or not button.width or not button.height then
+        return false
+    end
     return clickX >= button.x and clickX < button.x + button.width and
            clickY >= button.y and clickY < button.y + button.height
 end

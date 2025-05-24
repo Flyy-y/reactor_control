@@ -11,7 +11,7 @@ local alerts = {}
 local temperatureHistory = {}
 local batteryHistory = {}
 local reactorButtons = {}
-local controlPanelButtons = {}
+local controlPanelButtons = nil
 
 local function init()
     term.clear()
@@ -130,7 +130,7 @@ local function drawDisplay()
         end
         
         -- Battery position
-        local batteryY = math.floor(height / 2) + 2
+        local batteryY = math.floor(h / 2) + 2
         ui.drawBatteryStatus(2, batteryY, systemStatus.battery)
         
         -- Draw control panel if space allows
