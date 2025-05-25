@@ -12,6 +12,7 @@ local temperatureHistory = {}
 local batteryHistory = {}
 local reactorButtons = {}
 local pendingActions = {}  -- Track pending reactor state changes
+local lastSuccessfulUpdate = os.epoch("utc")  -- Track last successful update time
 
 local function init()
     term.clear()
@@ -43,6 +44,7 @@ local function requestSystemStatus()
     
     if success and response.data then
         systemStatus = response.data
+        lastSuccessfulUpdate = os.epoch("utc")  -- Update watchdog timer
         print("Got system status update")
         -- Clear pending actions as we have fresh data
         pendingActions = {}
@@ -178,6 +180,7 @@ local function main()
     
     local updateTimer = os.startTimer(config.update_interval)
     local requestTimer = os.startTimer(0.1)
+    local watchdogTimer = os.startTimer(5)  -- Check every 5 seconds
     
     while running do
         local event, p1, p2, p3, p4, p5 = os.pullEvent()
@@ -192,6 +195,32 @@ local function main()
                 requestSystemStatus()
                 requestAlerts()
                 requestTimer = os.startTimer(config.update_interval)
+            elseif p1 == watchdogTimer then
+                -- Check watchdog - if no successful update in 60 seconds
+                local timeSinceLastUpdate = (os.epoch("utc") - lastSuccessfulUpdate) / 1000
+                if timeSinceLastUpdate > 60 then
+                    print("Watchdog: No successful update for " .. math.floor(timeSinceLastUpdate) .. " seconds")
+                    
+                    -- Write crash report
+                    local crashFile = fs.open("/crash.txt", "w")
+                    crashFile.writeLine("=== DISPLAY CONTROLLER CRASH REPORT ===")
+                    crashFile.writeLine("Time: " .. os.date("%Y-%m-%d %H:%M:%S"))
+                    crashFile.writeLine("Reason: Watchdog timeout - no successful update for " .. math.floor(timeSinceLastUpdate) .. " seconds")
+                    crashFile.writeLine("Display ID: " .. config.display_id)
+                    crashFile.writeLine("")
+                    crashFile.writeLine("Action: Restarting computer...")
+                    crashFile.close()
+                    
+                    -- Show error on monitor before restarting
+                    showErrorOnMonitor("No updates - restarting")
+                    
+                    -- Wait a moment so message is visible
+                    os.sleep(2)
+                    
+                    -- Restart the computer
+                    os.reboot()
+                end
+                watchdogTimer = os.startTimer(5)
             end
         elseif event == "key" and p1 == keys.q then
             running = false
