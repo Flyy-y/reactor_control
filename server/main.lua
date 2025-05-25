@@ -6,7 +6,6 @@ local storage = dofile("/reactor_control/server/storage.lua")
 
 local config = dofile("/reactor_control/server/config.lua")
 
-local lastSaveTime = os.epoch("utc")
 local componentStatus = {}
 local manualScramReactors = {}  -- Track manually scrammed reactors
 
@@ -35,12 +34,10 @@ end
 local function handleReactorStatus(message, channel)
     local data = message.data
     rules.updateReactorState(data.reactor_id, data)
-    storage.addReactorData(data.reactor_id, data)
     
     componentStatus["reactor_" .. data.reactor_id] = os.epoch("utc")
     
     local decision = rules.getReactorDecision(data.reactor_id, config)
-    storage.addDecision(decision)
     
     if decision.action ~= "none" then
         local controlMsg = network.createMessage(
@@ -62,7 +59,6 @@ end
 local function handleBatteryStatus(message, channel)
     local data = message.data
     rules.updateBatteryState(data)
-    storage.addBatteryData(data)
     
     componentStatus["battery"] = os.epoch("utc")
 end
@@ -81,17 +77,10 @@ local function handleDisplayRequest(message, channel)
                 timestamp = os.epoch("utc")
             }
         end
-    elseif requestType == "reactor_history" then
-        response = storage.getReactorHistory(
-            message.data.reactor_id,
-            message.data.count or 100
-        )
-    elseif requestType == "battery_history" then
-        response = storage.getBatteryHistory(message.data.count or 100)
     elseif requestType == "alerts" then
-        response = storage.getRecentAlerts(message.data.count or 50)
-    elseif requestType == "stats" then
-        response = storage.getStats()
+        -- Return current active alerts from rules
+        local alerts = rules.checkAlerts(config)
+        response = alerts
     end
     
     if response then
@@ -203,8 +192,6 @@ local function checkAndSendAlerts()
     end
     
     for _, alert in ipairs(alerts) do
-        storage.addAlert(alert)
-        
         local alertMsg = network.createMessage(
             protocol.messageTypes.BROADCAST,
             protocol.commands.ALERT,
@@ -282,11 +269,7 @@ local function periodicTasks()
         storage.log("WARNING: Battery controller not responding")
     end
     
-    local now = os.epoch("utc")
-    if now - lastSaveTime > (config.data_retention.save_interval * 1000) then
-        storage.save()
-        lastSaveTime = now
-    end
+    -- Data saving removed - no longer persisting history
 end
 
 local function displayStatus()
@@ -378,7 +361,6 @@ local function main()
             end
         elseif event == "key" and p1 == keys.q then
             storage.log("Server shutdown by user")
-            storage.save()
             break
         end
     end

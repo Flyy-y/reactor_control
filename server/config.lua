@@ -38,10 +38,5 @@ return {
         enabled = true,
         max_entries = 1000,
         file = "server.log"
-    },
-    
-    data_retention = {
-        history_size = 500,
-        save_interval = 60
     }
 }
