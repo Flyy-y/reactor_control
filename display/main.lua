@@ -149,9 +149,13 @@ local function drawDisplay()
         ui.drawBatteryStatus(2, batteryY, systemStatus.battery)
         
         
-        -- Alerts on the right side if space allows
-        if w > 80 then
-            ui.drawAlerts(w - 30, 3, alerts)
+        -- Alerts on the right side or bottom if no space
+        if w > 60 then
+            -- Right side if enough width
+            ui.drawAlerts(math.floor(w / 2) + 2, 3, alerts)
+        elseif #alerts > 0 then
+            -- Bottom if not enough width but have alerts
+            ui.drawAlerts(2, batteryY + 8, alerts)
         end
     else
         ui.getMonitor().setCursorPos(2, 3)

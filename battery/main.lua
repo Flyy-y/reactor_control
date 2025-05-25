@@ -97,20 +97,47 @@ local function sendBatteryStatus()
         print(string.format("[%s] Sent battery status: %.1f%%", time, stats.energyPercent))
         lastSuccessfulSend = os.epoch("utc")
         failureCount = 0
+        
+        -- Clear any error messages and show success
+        term.setCursorPos(1, 10)
+        term.clearLine()
+        term.setTextColor(colors.green)
+        print("✓ Status sent successfully")
+        term.setTextColor(colors.white)
+        term.clearLine()
+        term.clearLine()
+        term.clearLine()
     else
         local time = os.date("%H:%M:%S")
         print(string.format("[%s] Error sending battery status: %s", time, tostring(sendError)))
         failureCount = failureCount + 1
         
+        -- Display error status on screen
+        term.setCursorPos(1, 10)
+        term.setTextColor(colors.red)
+        term.clearLine()
+        print("!!! FAILED TO SEND STATUS !!!")
+        term.clearLine()
+        print("Error: " .. string.sub(tostring(sendError), 1, 40))
+        term.clearLine()
+        print("Failure count: " .. failureCount)
+        term.setTextColor(colors.white)
+        
         -- If we've failed too many times, try to reinitialize
         if failureCount >= 5 then
+            term.setCursorPos(1, 14)
+            term.setTextColor(colors.orange)
             print("Too many failures, attempting to reinitialize...")
+            term.setTextColor(colors.white)
+            
             local initSuccess, initError = pcall(battery_api.initialize)
             if initSuccess then
                 print("Battery API reinitialized successfully")
                 failureCount = 0
             else
+                term.setTextColor(colors.red)
                 print("Failed to reinitialize battery API: " .. tostring(initError))
+                term.setTextColor(colors.white)
             end
         end
     end
@@ -242,6 +269,15 @@ local function main()
                     local time = os.date("%H:%M:%S")
                     print(string.format("[%s] WATCHDOG: No successful status sent in %d seconds", time, math.floor(timeSinceLastSend)))
                     print(string.format("[%s] Attempting recovery...", time))
+                    
+                    -- Display watchdog alert on screen
+                    term.setCursorPos(1, 16)
+                    term.setTextColor(colors.red)
+                    term.clearLine()
+                    print("!!! WATCHDOG ALERT !!!")
+                    term.clearLine()
+                    print("No successful send for " .. math.floor(timeSinceLastSend) .. " seconds")
+                    term.setTextColor(colors.white)
                     
                     -- Try to reinitialize everything
                     local initSuccess, initError = pcall(battery_api.initialize)

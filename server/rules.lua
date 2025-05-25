@@ -20,6 +20,16 @@ function rules.checkSafetyConditions(reactorId, config)
         return false, "No reactor data"
     end
     
+    -- Check battery timeout first (most critical)
+    if batteryState then
+        local timeSinceUpdate = (os.epoch("utc") - batteryState.lastUpdate) / 1000
+        if timeSinceUpdate > 30 then
+            return false, string.format("Battery offline for %d seconds - EMERGENCY SHUTDOWN", math.floor(timeSinceUpdate))
+        end
+    else
+        return false, "No battery data available - EMERGENCY SHUTDOWN"
+    end
+    
     local checks = {
         {
             condition = reactor.temperature < config.safety_rules.max_temperature,
@@ -45,21 +55,13 @@ function rules.checkSafetyConditions(reactorId, config)
             condition = reactor.fuel_percent > config.safety_rules.min_fuel_percent,
             reason = string.format("Low fuel: %.1f%% (min: %d%%)", 
                 reactor.fuel_percent, config.safety_rules.min_fuel_percent)
-        }
-    }
-    
-    if batteryState then
-        table.insert(checks, {
+        },
+        {
             condition = batteryState.percent_full < config.safety_rules.max_battery_percent,
             reason = string.format("Battery too full: %.1f%% (max: %d%%)", 
                 batteryState.percent_full, config.safety_rules.max_battery_percent)
-        })
-    else
-        table.insert(checks, {
-            condition = false,
-            reason = "No battery data available"
-        })
-    end
+        }
+    }
     
     for _, check in ipairs(checks) do
         if not check.condition then
@@ -172,11 +174,36 @@ function rules.checkAlerts(config)
         end
     end
     
-    if batteryState and batteryState.percent_full > config.alerts.battery_warning then
+    if batteryState then
+        -- Check battery timeout
+        local timeSinceUpdate = (os.epoch("utc") - batteryState.lastUpdate) / 1000
+        if timeSinceUpdate > 30 then
+            table.insert(alerts, {
+                level = "critical",
+                source = "battery",
+                message = string.format("BATTERY OFFLINE %ds - REACTORS SCRAMMED", math.floor(timeSinceUpdate))
+            })
+        elseif timeSinceUpdate > 20 then
+            table.insert(alerts, {
+                level = "warning",
+                source = "battery",
+                message = string.format("Battery not responding for %d seconds", math.floor(timeSinceUpdate))
+            })
+        end
+        
+        -- Check battery level
+        if batteryState.percent_full > config.alerts.battery_warning then
+            table.insert(alerts, {
+                level = "warning",
+                source = "battery",
+                message = "Battery nearly full: " .. string.format("%.1f%%", batteryState.percent_full)
+            })
+        end
+    else
         table.insert(alerts, {
-            level = "warning",
+            level = "critical",
             source = "battery",
-            message = "Battery nearly full: " .. string.format("%.1f%%", batteryState.percent_full)
+            message = "NO BATTERY DATA - REACTORS SCRAMMED"
         })
     end
     
