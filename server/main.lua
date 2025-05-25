@@ -117,21 +117,29 @@ local function optimizeBurnRates()
             
             -- Simple on/off control based on battery level
             if batteryPercent <= config.auto_control.battery_low and not reactor.active then
-                -- Battery low, turn reactor on
-                local activateMsg = network.createMessage(
-                    protocol.messageTypes.REQUEST,
-                    protocol.commands.REACTOR_CONTROL,
-                    {
-                        reactor_id = reactorId,
-                        action = "activate"
-                    }
-                )
+                -- Battery low, check if it's safe to turn reactor on
+                local safe, reason = rules.checkSafetyConditions(reactorId, config)
                 
-                local reactorChannel = config.reactor_channels[reactorId]
-                if reactorChannel then
-                    network.send(reactorChannel, activateMsg)
-                    storage.log("Auto-activated reactor " .. reactorId .. " (battery " .. string.format("%.1f%%", batteryPercent) .. ")")
-                    manualScramReactors[reactorId] = nil -- Clear manual scram flag
+                if safe then
+                    -- All safety conditions met, activate reactor
+                    local activateMsg = network.createMessage(
+                        protocol.messageTypes.REQUEST,
+                        protocol.commands.REACTOR_CONTROL,
+                        {
+                            reactor_id = reactorId,
+                            action = "activate"
+                        }
+                    )
+                    
+                    local reactorChannel = config.reactor_channels[reactorId]
+                    if reactorChannel then
+                        network.send(reactorChannel, activateMsg)
+                        storage.log("Auto-activated reactor " .. reactorId .. " (battery " .. string.format("%.1f%%", batteryPercent) .. ")")
+                        manualScramReactors[reactorId] = nil -- Clear manual scram flag
+                    end
+                else
+                    -- Safety conditions not met, log why we can't activate
+                    storage.log("Cannot auto-activate reactor " .. reactorId .. ": " .. reason)
                 end
                 
             elseif batteryPercent >= config.auto_control.battery_high and reactor.active then
