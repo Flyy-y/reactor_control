@@ -3,6 +3,7 @@ local rules = {}
 local reactorStates = {}
 local batteryState = nil
 local lastDecisions = {}
+local activeAlerts = {}  -- Track active alerts with timestamps
 
 function rules.updateReactorState(reactorId, state)
     reactorStates[reactorId] = state
@@ -132,82 +133,162 @@ function rules.getSystemStatus()
 end
 
 function rules.checkAlerts(config)
-    local alerts = {}
+    local currentAlerts = {}
+    local now = os.epoch("utc")
     
+    -- Helper function to create alert key
+    local function getAlertKey(source, alertType)
+        return source .. ":" .. alertType
+    end
+    
+    -- Check reactor alerts
     for reactorId, reactor in pairs(reactorStates) do
+        local source = "reactor_" .. reactorId
+        
+        -- Temperature alerts
         if reactor.temperature > config.alerts.temperature_critical then
-            table.insert(alerts, {
+            local key = getAlertKey(source, "temp_critical")
+            currentAlerts[key] = {
                 level = "critical",
-                source = "reactor_" .. reactorId,
-                message = "Critical temperature: " .. math.floor(reactor.temperature) .. "K"
-            })
+                source = source,
+                message = "Critical temperature: " .. math.floor(reactor.temperature) .. "K",
+                key = key
+            }
         elseif reactor.temperature > config.alerts.temperature_warning then
-            table.insert(alerts, {
+            local key = getAlertKey(source, "temp_warning")
+            currentAlerts[key] = {
                 level = "warning",
-                source = "reactor_" .. reactorId,
-                message = "High temperature: " .. math.floor(reactor.temperature) .. "K"
-            })
+                source = source,
+                message = "High temperature: " .. math.floor(reactor.temperature) .. "K",
+                key = key
+            }
         end
         
+        -- Waste alert
         if reactor.waste_percent > config.alerts.waste_warning then
-            table.insert(alerts, {
+            local key = getAlertKey(source, "waste")
+            currentAlerts[key] = {
                 level = "warning",
-                source = "reactor_" .. reactorId,
-                message = "High waste level: " .. string.format("%.1f%%", reactor.waste_percent)
-            })
+                source = source,
+                message = "High waste level: " .. string.format("%.1f%%", reactor.waste_percent),
+                key = key
+            }
         end
         
+        -- Fuel alert
         if reactor.fuel_percent < config.alerts.fuel_warning then
-            table.insert(alerts, {
+            local key = getAlertKey(source, "fuel")
+            currentAlerts[key] = {
                 level = "warning",
-                source = "reactor_" .. reactorId,
-                message = "Low fuel: " .. string.format("%.1f%%", reactor.fuel_percent)
-            })
+                source = source,
+                message = "Low fuel: " .. string.format("%.1f%%", reactor.fuel_percent),
+                key = key
+            }
         end
         
+        -- Coolant alert
         if reactor.coolant_percent < config.alerts.coolant_warning then
-            table.insert(alerts, {
+            local key = getAlertKey(source, "coolant")
+            currentAlerts[key] = {
                 level = "warning",
-                source = "reactor_" .. reactorId,
-                message = "Low coolant: " .. string.format("%.1f%%", reactor.coolant_percent)
-            })
+                source = source,
+                message = "Low coolant: " .. string.format("%.1f%%", reactor.coolant_percent),
+                key = key
+            }
         end
     end
     
+    -- Check battery alerts
     if batteryState then
-        -- Check battery timeout
-        local timeSinceUpdate = (os.epoch("utc") - batteryState.lastUpdate) / 1000
+        local timeSinceUpdate = (now - batteryState.lastUpdate) / 1000
         if timeSinceUpdate > 30 then
-            table.insert(alerts, {
+            local key = getAlertKey("battery", "offline_critical")
+            currentAlerts[key] = {
                 level = "critical",
                 source = "battery",
-                message = string.format("BATTERY OFFLINE %ds - REACTORS SCRAMMED", math.floor(timeSinceUpdate))
-            })
+                message = string.format("BATTERY OFFLINE %ds - REACTORS SCRAMMED", math.floor(timeSinceUpdate)),
+                key = key
+            }
         elseif timeSinceUpdate > 20 then
-            table.insert(alerts, {
+            local key = getAlertKey("battery", "offline_warning")
+            currentAlerts[key] = {
                 level = "warning",
                 source = "battery",
-                message = string.format("Battery not responding for %d seconds", math.floor(timeSinceUpdate))
-            })
+                message = string.format("Battery not responding for %d seconds", math.floor(timeSinceUpdate)),
+                key = key
+            }
         end
         
-        -- Check battery level
+        -- Battery level alert
         if batteryState.percent_full > config.alerts.battery_warning then
-            table.insert(alerts, {
+            local key = getAlertKey("battery", "level")
+            currentAlerts[key] = {
                 level = "warning",
                 source = "battery",
-                message = "Battery nearly full: " .. string.format("%.1f%%", batteryState.percent_full)
-            })
+                message = "Battery nearly full: " .. string.format("%.1f%%", batteryState.percent_full),
+                key = key
+            }
         end
     else
-        table.insert(alerts, {
+        local key = getAlertKey("battery", "no_data")
+        currentAlerts[key] = {
             level = "critical",
             source = "battery",
-            message = "NO BATTERY DATA - REACTORS SCRAMMED"
-        })
+            message = "NO BATTERY DATA - REACTORS SCRAMMED",
+            key = key
+        }
+    end
+    
+    -- Update active alerts tracker
+    for key, alert in pairs(currentAlerts) do
+        if not activeAlerts[key] then
+            -- New alert
+            activeAlerts[key] = {
+                alert = alert,
+                firstSeen = now,
+                lastSeen = now
+            }
+        else
+            -- Existing alert - update last seen time
+            activeAlerts[key].lastSeen = now
+            activeAlerts[key].alert = alert  -- Update message in case values changed
+        end
+    end
+    
+    -- Clear old alerts that haven't been seen for 30 seconds
+    local alertsToRemove = {}
+    for key, alertData in pairs(activeAlerts) do
+        if not currentAlerts[key] then
+            -- Alert condition no longer present
+            local timeSinceCleared = (now - alertData.lastSeen) / 1000
+            if timeSinceCleared > 30 then
+                table.insert(alertsToRemove, key)
+            end
+        end
+    end
+    
+    -- Remove cleared alerts and track them
+    rules._clearedAlerts = {}
+    for _, key in ipairs(alertsToRemove) do
+        if activeAlerts[key] then
+            table.insert(rules._clearedAlerts, activeAlerts[key].alert)
+        end
+        activeAlerts[key] = nil
+    end
+    
+    -- Return only active alerts
+    local alerts = {}
+    for _, alertData in pairs(activeAlerts) do
+        table.insert(alerts, alertData.alert)
     end
     
     return alerts
+end
+
+function rules.getClearedAlerts()
+    local cleared = rules._clearedAlerts or {}
+    rules._clearedAlerts = {}  -- Reset after reading
+    return cleared
 end
 
 function rules.isStale(lastUpdate, timeout)

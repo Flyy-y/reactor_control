@@ -285,7 +285,7 @@ end
 local function checkServerTimeout()
     local timeSinceContact = (os.epoch("utc") - lastServerContact) / 1000  -- Convert to seconds
     
-    if timeSinceContact > 20 and isActive() then
+    if timeSinceContact > 15 and isActive() then
         print("\nWARNING: No server contact for " .. math.floor(timeSinceContact) .. " seconds!")
         print("SAFETY SHUTDOWN - Scraming reactor!")
         scram()
@@ -431,6 +431,32 @@ local function handlePing(message, channel)
     print("Received server ping")
 end
 
+-- Ensure reactor is shut down on any exit
+local function safeShutdown(reason)
+    print("\nSAFETY: Ensuring reactor is shut down...")
+    print("Reason: " .. (reason or "Unknown"))
+    
+    -- Try multiple times to ensure reactor is off
+    for i = 1, 3 do
+        local success = scram()
+        if success then
+            print("Reactor SCRAM successful (attempt " .. i .. ")")
+            break
+        else
+            print("SCRAM attempt " .. i .. " failed, retrying...")
+            os.sleep(0.5)
+        end
+    end
+    
+    -- Final check
+    if isActive() then
+        print("WARNING: Reactor may still be active!")
+        print("MANUAL INTERVENTION REQUIRED!")
+    else
+        print("Reactor confirmed OFF")
+    end
+end
+
 local function main()
     init()
     
@@ -468,15 +494,31 @@ local function main()
                 print("\nEmergency shutdown!")
                 scram()
             end
+        elseif event == "terminate" then
+            -- Handle Ctrl+T
+            running = false
+            print("\nTerminate signal received!")
         end
     end
     
-    print("\nShutting down controller...")
-    scram()
+    safeShutdown("Normal shutdown")
 end
 
-local success, err = pcall(main)
-if not success then
-    print("Controller error: " .. tostring(err))
-    scram()
+-- Wrap entire program to catch ALL exits
+local function safeMain()
+    local success, err = pcall(main)
+    if not success then
+        print("Controller error: " .. tostring(err))
+        safeShutdown("Error: " .. tostring(err))
+    end
+end
+
+-- Final safety wrapper
+local finalSuccess, finalErr = pcall(safeMain)
+if not finalSuccess then
+    print("CRITICAL ERROR: " .. tostring(finalErr))
+    -- Last ditch effort to shut down reactor
+    if reactor then
+        pcall(function() reactor.scram() end)
+    end
 end

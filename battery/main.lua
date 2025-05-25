@@ -233,7 +233,7 @@ local function main()
     local statusTimer = os.startTimer(config.update_interval)
     local heartbeatTimer = os.startTimer(config.heartbeat_interval)
     local displayTimer = os.startTimer(config.display.update_interval)
-    local watchdogTimer = os.startTimer(30)  -- Check every 30 seconds
+    local watchdogTimer = os.startTimer(15)  -- Check every 30 seconds
     
     sendBatteryStatus()
     sendHeartbeat()
@@ -279,37 +279,29 @@ local function main()
                     print("No successful send for " .. math.floor(timeSinceLastSend) .. " seconds")
                     term.setTextColor(colors.white)
                     
-                    -- Try to reinitialize everything
-                    local initSuccess, initError = pcall(battery_api.initialize)
-                    if initSuccess then
-                        print("Battery API reinitialized")
-                        lastSuccessfulSend = os.epoch("utc")
-                        failureCount = 0
-                    else
-                        print("Recovery failed: " .. tostring(initError))
-                        
-                        -- Write crash report
-                        local crashFile = fs.open("/crash.txt", "w")
-                        crashFile.writeLine("=== BATTERY CONTROLLER CRASH REPORT ===")
-                        crashFile.writeLine("Time: " .. os.date("%Y-%m-%d %H:%M:%S"))
-                        crashFile.writeLine("Reason: Watchdog timeout - no successful send for " .. math.floor(timeSinceLastSend) .. " seconds")
-                        crashFile.writeLine("Last error: " .. tostring(initError))
-                        crashFile.writeLine("Failure count: " .. failureCount)
-                        crashFile.writeLine("Last successful send: " .. math.floor(timeSinceLastSend) .. " seconds ago")
-                        crashFile.writeLine("")
-                        crashFile.writeLine("Action: Restarting computer...")
-                        crashFile.close()
-                        
-                        -- Display restart message
-                        term.setCursorPos(1, 20)
-                        term.setTextColor(colors.red)
-                        print("!!! CRITICAL FAILURE - RESTARTING !!!")
-                        term.setTextColor(colors.white)
-                        sleep(2)
-                        
-                        -- Restart the computer
-                        os.reboot()
-                    end
+                    -- Don't attempt to reinitialize, just restart
+                    print("Watchdog timeout - restarting computer...")
+                    
+                    -- Write crash report
+                    local crashFile = fs.open("/crash.txt", "w")
+                    crashFile.writeLine("=== BATTERY CONTROLLER CRASH REPORT ===")
+                    crashFile.writeLine("Time: " .. os.date("%Y-%m-%d %H:%M:%S"))
+                    crashFile.writeLine("Reason: Watchdog timeout - no successful send for " .. math.floor(timeSinceLastSend) .. " seconds")
+                    crashFile.writeLine("Failure count: " .. failureCount)
+                    crashFile.writeLine("Last successful send: " .. math.floor(timeSinceLastSend) .. " seconds ago")
+                    crashFile.writeLine("")
+                    crashFile.writeLine("Action: Restarting computer...")
+                    crashFile.close()
+                    
+                    -- Display restart message
+                    term.setCursorPos(1, 20)
+                    term.setTextColor(colors.red)
+                    print("!!! WATCHDOG TIMEOUT - RESTARTING !!!")
+                    term.setTextColor(colors.white)
+                    sleep(2)
+                    
+                    -- Restart the computer
+                    os.reboot()
                 end
                 watchdogTimer = os.startTimer(30)
             end

@@ -13,6 +13,7 @@ local batteryHistory = {}
 local reactorButtons = {}
 local pendingActions = {}  -- Track pending reactor state changes
 local lastSuccessfulUpdate = os.epoch("utc")  -- Track last successful update time
+local serverConnectionLost = false  -- Track if we should show BSOD
 
 local function init()
     term.clear()
@@ -45,11 +46,17 @@ local function requestSystemStatus()
     if success and response.data then
         systemStatus = response.data
         lastSuccessfulUpdate = os.epoch("utc")  -- Update watchdog timer
+        serverConnectionLost = false  -- Connection is good
         print("Got system status update")
         -- Clear pending actions as we have fresh data
         pendingActions = {}
     else
         print("Failed to get system status: " .. tostring(response))
+        -- Check if we should show BSOD (after 10 seconds of failures)
+        local timeSinceUpdate = (os.epoch("utc") - lastSuccessfulUpdate) / 1000
+        if timeSinceUpdate > 10 then
+            serverConnectionLost = true
+        end
         -- Don't clear systemStatus, keep showing last known data
         return
     end
@@ -120,6 +127,12 @@ local function sendReactorControl(reactorId, action, value)
 end
 
 local function drawDisplay()
+    -- Check if we should show BSOD
+    if serverConnectionLost then
+        showServerConnectionError()
+        return
+    end
+    
     ui.clear()
     ui.drawHeader("REACTOR CONTROL SYSTEM")
     
@@ -198,7 +211,7 @@ local function main()
             elseif p1 == watchdogTimer then
                 -- Check watchdog - if no successful update in 60 seconds
                 local timeSinceLastUpdate = (os.epoch("utc") - lastSuccessfulUpdate) / 1000
-                if timeSinceLastUpdate > 60 then
+                if timeSinceLastUpdate > 15 then
                     print("Watchdog: No successful update for " .. math.floor(timeSinceLastUpdate) .. " seconds")
                     
                     -- Write crash report
@@ -225,6 +238,11 @@ local function main()
         elseif event == "key" and p1 == keys.q then
             running = false
         elseif event == "monitor_touch" then
+            -- Don't process touches if connection is lost
+            if serverConnectionLost then
+                return
+            end
+            
             local x, y = p2, p3
             
             -- Check reactor buttons
@@ -290,6 +308,71 @@ local function showErrorOnMonitor(errorMsg)
                 monitor.setCursorPos(2, h - 1)
                 monitor.write("Error: " .. string.sub(tostring(errorMsg), 1, w - 4))
             end
+        end
+    end
+end
+
+-- Function to show BSOD-style error for server connection failure
+local function showServerConnectionError()
+    if ui and ui.getMonitor then
+        local monitor = ui.getMonitor()
+        if monitor then
+            -- Set blue background (BSOD style)
+            monitor.setBackgroundColor(colors.blue)
+            monitor.clear()
+            monitor.setTextColor(colors.white)
+            
+            local w, h = monitor.getSize()
+            
+            -- Title
+            monitor.setTextScale(1.5)
+            local title = "SERVER CONNECTION LOST"
+            monitor.setCursorPos(math.floor((w - #title) / 2) + 1, 2)
+            monitor.write(title)
+            
+            -- Error face :(
+            monitor.setTextScale(3)
+            local face = ":("
+            monitor.setCursorPos(math.floor((w - #face) / 2) + 1, math.floor(h / 3))
+            monitor.write(face)
+            
+            -- Error details
+            monitor.setTextScale(0.5)
+            local y = math.floor(h / 2) + 2
+            
+            local lines = {
+                "The reactor control server is not responding.",
+                "",
+                "This could mean:",
+                "- The server computer has crashed",
+                "- Network connection has been lost",
+                "- The server is overloaded",
+                "",
+                "Attempting to reconnect..."
+            }
+            
+            for _, line in ipairs(lines) do
+                monitor.setCursorPos(math.floor((w - #line) / 2) + 1, y)
+                monitor.write(line)
+                y = y + 1
+            end
+            
+            -- Status bar at bottom
+            monitor.setCursorPos(1, h - 1)
+            monitor.setBackgroundColor(colors.lightBlue)
+            monitor.clearLine()
+            local timeSinceUpdate = math.floor((os.epoch("utc") - lastSuccessfulUpdate) / 1000)
+            local status = string.format(" Last update: %d seconds ago | Display ID: %d ", timeSinceUpdate, config.display_id)
+            monitor.setCursorPos(math.floor((w - #status) / 2) + 1, h - 1)
+            monitor.write(status)
+            
+            -- Reset background for next line
+            monitor.setBackgroundColor(colors.blue)
+            monitor.setCursorPos(1, h)
+            monitor.clearLine()
+            local hint = "Press Ctrl+R to restart | Ctrl+T to terminate"
+            monitor.setCursorPos(math.floor((w - #hint) / 2) + 1, h)
+            monitor.write(hint)
         end
     end
 end

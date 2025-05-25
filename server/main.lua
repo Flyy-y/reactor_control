@@ -170,6 +170,7 @@ local batteryPingAttempted = {}  -- Track when we last tried to ping battery
 
 local function checkAndSendAlerts()
     local alerts = rules.checkAlerts(config)
+    local clearedAlerts = rules.getClearedAlerts()  -- Get alerts that were cleared
     
     -- Check if battery is not responding and needs a ping
     local status = rules.getSystemStatus()
@@ -194,6 +195,11 @@ local function checkAndSendAlerts()
             
             batteryPingAttempted.last = os.epoch("utc")
         end
+    end
+    
+    -- Log cleared alerts
+    for _, alert in ipairs(clearedAlerts) do
+        storage.log("ALERT CLEARED [" .. alert.level .. "] " .. alert.source .. ": " .. alert.message)
     end
     
     for _, alert in ipairs(alerts) do
