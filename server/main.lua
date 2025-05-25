@@ -166,8 +166,35 @@ local function optimizeBurnRates()
     end
 end
 
+local batteryPingAttempted = {}  -- Track when we last tried to ping battery
+
 local function checkAndSendAlerts()
     local alerts = rules.checkAlerts(config)
+    
+    -- Check if battery is not responding and needs a ping
+    local status = rules.getSystemStatus()
+    if status.battery then
+        local timeSinceUpdate = (os.epoch("utc") - status.battery.lastUpdate) / 1000
+        local lastPingTime = batteryPingAttempted.last or 0
+        local timeSincePing = (os.epoch("utc") - lastPingTime) / 1000
+        
+        -- If battery hasn't responded in 10+ seconds and we haven't pinged in the last 30 seconds
+        if timeSinceUpdate > 10 and timeSincePing > 30 then
+            storage.log("Battery not responding for " .. math.floor(timeSinceUpdate) .. "s - sending wake-up ping")
+            
+            local batteryPingMsg = network.createMessage(
+                protocol.messageTypes.REQUEST,
+                protocol.commands.HEARTBEAT,
+                {
+                    type = "ping",
+                    timestamp = os.epoch("utc")
+                }
+            )
+            network.send(config.battery_channel, batteryPingMsg)
+            
+            batteryPingAttempted.last = os.epoch("utc")
+        end
+    end
     
     for _, alert in ipairs(alerts) do
         storage.addAlert(alert)
